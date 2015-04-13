@@ -1,0 +1,5 @@
+dconf-editor (3.16.0-1) UNRELEASED; urgency=medium
+
+  * Initial release.
+
+ -- Iain Lane <laney@debian.org>  Mon, 13 Apr 2015 12:43:31 +0100
