@@ -6,6 +6,7 @@ dconf-editor (3.16.1-1) UNRELEASED; urgency=medium
   * Point Homepage to the dconf project wiki page.
   * Bump debhelper compatibility level to 9.
   * Fix debian/copyright to comply with version 1.0 of the spec.
+  * Update Build-Depends as per configure.ac.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 27 May 2015 01:41:46 +0200
 
