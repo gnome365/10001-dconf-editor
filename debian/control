@@ -6,9 +6,8 @@ Source: dconf-editor
 Section: utils
 Priority: optional
 Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>
-Uploaders: Iain Lane <laney@debian.org>
+Uploaders: Iain Lane <laney@debian.org>, Michael Biebl <biebl@debian.org>
 Standards-Version: 3.9.6
-Homepage: https://wiki.gnome.org/Apps/EyeOfGnome
 Build-Depends: dh-autoreconf,
                cdbs (>= 0.4.41),
                debhelper (>= 8),
@@ -20,8 +19,9 @@ Build-Depends: dh-autoreconf,
                libgtk-3-dev (>= 3.4),
                libxml2-dev,
                pkg-config
-Vcs-Svn: svn://anonscm.debian.org/pkg-gnome/desktop/experimental/dconf-editor
-Vcs-Browser: http://anonscm.debian.org/viewvc/pkg-gnome/desktop/experimental/dconf-editor
+Vcs-Svn: svn://anonscm.debian.org/pkg-gnome/desktop/unstable/dconf-editor
+Vcs-Browser: http://anonscm.debian.org/viewvc/pkg-gnome/desktop/unstable/dconf-editor
+Homepage: https://wiki.gnome.org/Projects/dconf
 
 Package: dconf-editor
 Architecture: any
