@@ -4,6 +4,7 @@ dconf-editor (3.16.1-1) UNRELEASED; urgency=medium
   * New upstream release.
   * Point Vcs-* to the unstable branch.
   * Point Homepage to the dconf project wiki page.
+  * Bump debhelper compatibility level to 9.
 
  -- Michael Biebl <biebl@debian.org>  Wed, 27 May 2015 01:41:46 +0200
 
