@@ -1,8 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: dconf-editor
 Source: ftp://ftp.gnome.org/pub/GNOME/sources/dconf-editor/
-
-X-Comment: The COPYING file is LGPL-2+. This was a mistake upstraem.
+Comment: The COPYING file is LGPL-2+. This was a mistake upstream.
 
 Files: *
 Copyright: 2010-2015 Canonical Ltd
