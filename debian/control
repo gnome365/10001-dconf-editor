@@ -6,17 +6,17 @@ Source: dconf-editor
 Section: utils
 Priority: optional
 Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>
-Uploaders: Iain Lane <laney@debian.org>, Michael Biebl <biebl@debian.org>
+Uploaders: Andreas Henriksson <andreas@fatal.se>, Iain Lane <laney@debian.org>, Michael Biebl <biebl@debian.org>
 Standards-Version: 3.9.6
 Build-Depends: dh-autoreconf,
                cdbs (>= 0.4.41),
                debhelper (>= 9),
                gnome-pkg-tools (>= 0.10),
                intltool (>= 0.50.0),
-               valac (>= 0.18.0),
+               valac (>= 0.25.1),
                libdconf-dev (>= 0.23.2),
                libglib2.0-dev (>= 2.39.3),
-               libgtk-3-dev (>= 3.4),
+               libgtk-3-dev (>= 3.14.0),
                libxml2-dev,
                pkg-config
 Vcs-Svn: svn://anonscm.debian.org/pkg-gnome/desktop/unstable/dconf-editor
