@@ -1,11 +1,11 @@
-dconf-editor (3.18.0-1) UNRELEASED; urgency=medium
+dconf-editor (3.18.0-1) unstable; urgency=medium
 
   * New upstream release.
   * Update build-dependencies according to configure.ac changes:
     - bump valac to >= 0.25.1
     - bump libgtk-3-dev to >= 3.14.0
 
- -- Andreas Henriksson <andreas@fatal.se>  Wed, 23 Sep 2015 21:08:04 +0200
+ -- Andreas Henriksson <andreas@fatal.se>  Fri, 25 Sep 2015 10:06:28 +0200
 
 dconf-editor (3.16.1-1) unstable; urgency=medium
 
