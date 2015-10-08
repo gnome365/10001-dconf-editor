@@ -20,7 +20,7 @@ Build-Depends: dh-autoreconf,
                libxml2-dev,
                pkg-config
 Vcs-Svn: svn://anonscm.debian.org/pkg-gnome/desktop/unstable/dconf-editor
-Vcs-Browser: http://anonscm.debian.org/viewvc/pkg-gnome/desktop/unstable/dconf-editor
+Vcs-Browser: https://anonscm.debian.org/viewvc/pkg-gnome/desktop/unstable/dconf-editor
 Homepage: https://wiki.gnome.org/Projects/dconf
 
 Package: dconf-editor
