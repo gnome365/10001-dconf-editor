@@ -1,4 +1,4 @@
-dconf-editor (3.20.1-1) UNRELEASED; urgency=medium
+dconf-editor (3.20.1-1) unstable; urgency=medium
 
   * New upstream release.
   * Update Build-Depends as per configure.ac:
@@ -12,7 +12,7 @@ dconf-editor (3.20.1-1) UNRELEASED; urgency=medium
     accordingly.
   * Bump Standards-Version to 3.9.8.
 
- -- Michael Biebl <biebl@debian.org>  Sun, 17 Apr 2016 17:37:39 +0200
+ -- Michael Biebl <biebl@debian.org>  Sun, 17 Apr 2016 17:45:35 +0200
 
 dconf-editor (3.18.2-1) unstable; urgency=medium
 
