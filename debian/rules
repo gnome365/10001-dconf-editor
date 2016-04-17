@@ -8,7 +8,7 @@ include /usr/share/gnome-pkg-tools/1/rules/uploaders.mk
 -include /usr/share/gnome-pkg-tools/1/rules/gnome-get-source.mk
 
 DEB_DH_AUTORECONF_ARGS = --as-needed
-DEB_DH_STRIP_ARGS = --dbg-package=dconf-editor-dbg
+DEB_DH_STRIP_ARGS = --dbgsym-migration='dconf-editor-dbg (<< 3.20.1-1~)'
 LDFLAGS += -Wl,--as-needed
 
 common-binary-post-install-arch:: list-missing
