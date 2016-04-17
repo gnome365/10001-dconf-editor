@@ -13,11 +13,11 @@ Build-Depends: dh-autoreconf,
                debhelper (>= 9),
                gnome-pkg-tools (>= 0.10),
                intltool (>= 0.50.0),
+               appstream-util,
                valac (>= 0.25.1),
                libdconf-dev (>= 0.23.2),
-               libglib2.0-dev (>= 2.39.3),
-               libgtk-3-dev (>= 3.14.0),
-               libxml2-dev,
+               libglib2.0-dev (>= 2.46.0),
+               libgtk-3-dev (>= 3.19.5),
                pkg-config
 Vcs-Svn: svn://anonscm.debian.org/pkg-gnome/desktop/unstable/dconf-editor
 Vcs-Browser: https://anonscm.debian.org/viewvc/pkg-gnome/desktop/unstable/dconf-editor

@@ -1,6 +1,11 @@
 dconf-editor (3.20.1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * Update Build-Depends as per configure.ac:
+    - Add appstream-util.
+    - Drop libxml2-dev.
+    - Bump libglib2.0-dev to (>= 2.46.0).
+    - Bump libgtk-3-dev to (>= 3.19.5).
 
  -- Michael Biebl <biebl@debian.org>  Sun, 17 Apr 2016 17:37:39 +0200
 
