@@ -10,6 +10,7 @@ dconf-editor (3.20.1-1) UNRELEASED; urgency=medium
   * Ensure proper upgrade from dconf-editor-dbg to new dbgsym packages by
     using dh_strip --dbgsym-migration. Bump Build-Depends on debhelper
     accordingly.
+  * Bump Standards-Version to 3.9.8.
 
  -- Michael Biebl <biebl@debian.org>  Sun, 17 Apr 2016 17:37:39 +0200
 
