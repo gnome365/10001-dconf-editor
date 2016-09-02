@@ -3,21 +3,20 @@ Section: utils
 Priority: optional
 Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>
 Uploaders: @GNOME_TEAM@
-Standards-Version: 3.9.6
-Homepage: https://wiki.gnome.org/Apps/EyeOfGnome
+Standards-Version: 3.9.8
 Build-Depends: dh-autoreconf,
-               cdbs (>= 0.4.41),
-               debhelper (>= 8),
+               debhelper (>= 9.20160114),
                gnome-pkg-tools (>= 0.10),
-               gtk-doc-tools (>= 1.16),
-               intltool (>= 0.40.0),
+               intltool (>= 0.50.0),
+               appstream-util,
+               valac (>= 0.25.1),
                libdconf-dev (>= 0.23.2),
-               libglib2.0-dev (>= 2.39.3),
-               libgtk-3-dev (>= 3.4),
-               libxml2-dev,
+               libglib2.0-dev (>= 2.46.0),
+               libgtk-3-dev (>= 3.19.5),
                pkg-config
-Vcs-Svn: svn://anonscm.debian.org/pkg-gnome/desktop/experimental/dconf-editor
-Vcs-Browser: http://anonscm.debian.org/viewvc/pkg-gnome/desktop/experimental/dconf-editor
+Vcs-Svn: svn://anonscm.debian.org/pkg-gnome/desktop/unstable/dconf-editor
+Vcs-Browser: https://anonscm.debian.org/viewvc/pkg-gnome/desktop/unstable/dconf-editor
+Homepage: https://wiki.gnome.org/Projects/dconf
 
 Package: dconf-editor
 Architecture: any
@@ -29,14 +28,3 @@ Description: simple configuration storage system - graphical editor
  environment settings.
  .
  This package contains a graphical editor for settings stored in dconf.
-
-Package: dconf-editor-dbg
-Section: debug
-Architecture: any
-Priority: extra
-Depends: dconf-editor (= ${binary:Version}), ${misc:Depends}
-Description: simple configuration storage system editor - debugging symbols
- DConf is a low-level key/value database designed for storing desktop
- environment settings.
- .
- This package debugging symbols for dconf's graphical editor.
