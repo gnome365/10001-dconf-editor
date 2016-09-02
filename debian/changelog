@@ -1,3 +1,9 @@
+dconf-editor (3.21.90-1) UNRELEASED; urgency=medium
+
+  * New upstream release.
+
+ -- Michael Biebl <biebl@debian.org>  Fri, 02 Sep 2016 18:31:20 +0200
+
 dconf-editor (3.20.3-1) unstable; urgency=medium
 
   * New upstream release.
