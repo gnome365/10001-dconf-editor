@@ -1,10 +1,10 @@
-dconf-editor (3.22.1-1) UNRELEASED; urgency=medium
+dconf-editor (3.22.1-1) unstable; urgency=medium
 
   * New upstream release.
   * Drop dh_install override. The use of --list-missing is not useful with
     only a single binary package.
 
- -- Michael Biebl <biebl@debian.org>  Tue, 11 Oct 2016 17:14:06 +0200
+ -- Michael Biebl <biebl@debian.org>  Tue, 11 Oct 2016 17:19:47 +0200
 
 dconf-editor (3.22.0-1) unstable; urgency=medium
 
