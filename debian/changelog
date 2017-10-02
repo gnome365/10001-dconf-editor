@@ -1,11 +1,11 @@
-dconf-editor (3.26.1-1) UNRELEASED; urgency=medium
+dconf-editor (3.26.1-1) unstable; urgency=medium
 
   * New upstream release
   * debian/control.in:
     - Drop obsolete Build-Depends on intltool
   * Bump Standards-Version to 4.1.1
 
- -- Jeremy Bicha <jbicha@debian.org>  Mon, 02 Oct 2017 11:32:33 -0400
+ -- Jeremy Bicha <jbicha@debian.org>  Mon, 02 Oct 2017 11:44:19 -0400
 
 dconf-editor (3.22.3-1) unstable; urgency=medium
 
