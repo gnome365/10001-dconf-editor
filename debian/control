@@ -6,11 +6,10 @@ Source: dconf-editor
 Section: utils
 Priority: optional
 Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>
-Uploaders: Emilio Pozuelo Monfort <pochu@debian.org>, Michael Biebl <biebl@debian.org>
+Uploaders: Emilio Pozuelo Monfort <pochu@debian.org>, Jeremy Bicha <jbicha@debian.org>, Michael Biebl <biebl@debian.org>
 Standards-Version: 3.9.8
 Build-Depends: debhelper (>= 10),
                gnome-pkg-tools (>= 0.10),
-               intltool (>= 0.50.0),
                appstream-util,
                valac (>= 0.33.1),
                libdconf-dev (>= 0.25.1),
