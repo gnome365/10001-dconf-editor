@@ -1,3 +1,9 @@
+dconf-editor (3.26.2-1) UNRELEASED; urgency=medium
+
+  * New upstream release (LP: #1729108)
+
+ -- Jeremy Bicha <jbicha@debian.org>  Tue, 31 Oct 2017 20:28:00 -0400
+
 dconf-editor (3.26.1-1) unstable; urgency=medium
 
   * New upstream release
