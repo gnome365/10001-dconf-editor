@@ -16,8 +16,8 @@ Build-Depends: debhelper (>= 10),
                libglib2.0-dev (>= 2.46.0),
                libgtk-3-dev (>= 3.22.0),
                pkg-config
-Vcs-Svn: svn://anonscm.debian.org/pkg-gnome/desktop/unstable/dconf-editor
-Vcs-Browser: https://anonscm.debian.org/viewvc/pkg-gnome/desktop/unstable/dconf-editor
+Vcs-Git: https://anonscm.debian.org/git/pkg-gnome/dconf-editor.git
+Vcs-Browser: https://anonscm.debian.org/git/pkg-gnome/dconf-editor.git
 Homepage: https://wiki.gnome.org/Projects/dconf
 
 Package: dconf-editor
