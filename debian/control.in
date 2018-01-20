@@ -3,7 +3,7 @@ Section: utils
 Priority: optional
 Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>
 Uploaders: @GNOME_TEAM@
-Build-Depends: debhelper (>= 10),
+Build-Depends: debhelper (>= 11),
                gnome-pkg-tools (>= 0.10),
                appstream-util,
                valac (>= 0.33.1),
