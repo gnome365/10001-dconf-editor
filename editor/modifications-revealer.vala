@@ -20,26 +20,29 @@ using Gtk;
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/modifications-revealer.ui")]
 class ModificationsRevealer : Revealer
 {
-    private enum Mode {
-        NONE,
-        TEMPORARY,
-        DELAYED
+    private ModificationsHandler _modifications_handler;
+    public ModificationsHandler modifications_handler
+    {
+        private get { return _modifications_handler; }
+        set
+        {
+            _modifications_handler = value;
+            _modifications_handler.delayed_changes_changed.connect (update);
+        }
     }
-    private Mode mode = Mode.NONE;
 
     [GtkChild] private Label label;
     [GtkChild] private ModelButton apply_button;
+    [GtkChild] private MenuButton delayed_list_button;
+    [GtkChild] private Popover delayed_settings_list_popover;
+    [GtkChild] private ListBox delayed_settings_listbox;
 
     private ThemedIcon apply_button_icon = new ThemedIcon.from_names ({"object-select-symbolic"});
 
-    private DConf.Client dconf_client = new DConf.Client ();
-
-    private HashTable<string, DConfKey>         dconf_keys_awaiting_hashtable = new HashTable<string, DConfKey>     (str_hash, str_equal);
-    private HashTable<string, GSettingsKey> gsettings_keys_awaiting_hashtable = new HashTable<string, GSettingsKey> (str_hash, str_equal);
-
-    public signal void reload ();
-
-    public Behaviour behaviour { get; set; }
+    construct
+    {
+        delayed_settings_listbox.set_header_func (delayed_setting_row_update_header);
+    }
 
     /*\
     * * Window management callbacks
@@ -64,194 +67,218 @@ class ModificationsRevealer : Revealer
     }
 
     /*\
-    * * Public calls
+    * * Reseting objects
     \*/
 
-    public bool get_current_delay_mode ()
+    public void reset_objects (GLib.ListStore? objects, bool recursively)
     {
-        return mode == Mode.DELAYED || behaviour == Behaviour.ALWAYS_DELAY;
+        _reset_objects (objects, recursively);
+        warn_if_no_planned_changes ();
     }
 
-    public bool should_delay_apply (string type_string)
+    private void _reset_objects (GLib.ListStore? objects, bool recursively)
     {
-        if (get_current_delay_mode () || behaviour == Behaviour.ALWAYS_CONFIRM_IMPLICIT || behaviour == Behaviour.ALWAYS_CONFIRM_EXPLICIT)
-            return true;
-        if (behaviour == Behaviour.UNSAFE)
-            return false;
-        if (behaviour == Behaviour.SAFE)
-            return type_string != "b" && type_string != "mb" && type_string != "<enum>" && type_string != "<flags>";
-        assert_not_reached ();
-    }
-
-    public void enter_delay_mode ()
-    {
-        mode = Mode.DELAYED;
-        apply_button.sensitive = dconf_keys_awaiting_hashtable.length + gsettings_keys_awaiting_hashtable.length != 0;
-        update ();
-    }
-
-    public void add_delayed_setting (Key key, Variant? new_value)
-    {
-        key.planned_change = true;
-        key.planned_value = new_value;
-
-        if (key is GSettingsKey)
-            gsettings_keys_awaiting_hashtable.insert (key.descriptor, (GSettingsKey) key);
-        else
-            dconf_keys_awaiting_hashtable.insert (key.descriptor, (DConfKey) key);
-
-        mode = get_current_delay_mode () ? Mode.DELAYED : Mode.TEMPORARY;
-
-        apply_button.sensitive = true;
-        update ();
-    }
-
-    public void dismiss_change (Key key)
-    {
-        if (mode == Mode.NONE)
-            mode = behaviour == Behaviour.ALWAYS_DELAY ? Mode.DELAYED : Mode.TEMPORARY;
-
-        key.planned_change = false;
-        key.planned_value = null;
-
-        if (key is GSettingsKey)
-            gsettings_keys_awaiting_hashtable.remove (key.descriptor);
-        else
-            dconf_keys_awaiting_hashtable.remove (key.descriptor);
-
-        apply_button.sensitive = (mode != Mode.TEMPORARY) && (dconf_keys_awaiting_hashtable.length + gsettings_keys_awaiting_hashtable.length != 0);
-        update ();
-    }
-
-    public void path_changed ()
-    {
-        if (mode != Mode.TEMPORARY)
+        SettingsModel model = modifications_handler.model;
+        if (objects == null)
             return;
-        if (behaviour == Behaviour.ALWAYS_CONFIRM_IMPLICIT || behaviour == Behaviour.SAFE)
-            apply_delayed_settings ();
-        else if (behaviour == Behaviour.ALWAYS_CONFIRM_EXPLICIT)
-            dismiss_delayed_settings ();
-        else
-            assert_not_reached ();
+
+        for (uint position = 0;; position++)
+        {
+            Object? object = ((!) objects).get_object (position);
+            if (object == null)
+                return;
+
+            SettingObject setting_object = (SettingObject) ((!) object);
+            if (setting_object is Directory)
+            {
+                if (recursively)
+                {
+                    GLib.ListStore? children = model.get_children (setting_object.full_name);
+                    if (children != null)
+                        _reset_objects ((!) children, true);
+                }
+                continue;
+            }
+            if (setting_object is DConfKey)
+            {
+                if (!model.is_key_ghost ((DConfKey) setting_object))
+                    modifications_handler.add_delayed_setting (setting_object.full_name, null);
+            }
+            else if (!model.is_key_default ((GSettingsKey) setting_object))
+                modifications_handler.add_delayed_setting (setting_object.full_name, null);
+        }
     }
 
-    public void warn_if_no_planned_changes ()
+    private void warn_if_no_planned_changes ()
     {
-        if (dconf_keys_awaiting_hashtable.length == 0 && gsettings_keys_awaiting_hashtable.length == 0)
+        if (modifications_handler.dconf_changes_count == 0 && modifications_handler.gsettings_changes_count == 0)
             label.set_text (_("Nothing to reset."));
     }
 
     /*\
-    * * Buttons callbacks
+    * * Modifications list public functions
     \*/
 
-    [GtkCallback]
-    public void apply_delayed_settings ()
+    public bool dismiss_selected_modification ()
     {
-        mode = Mode.NONE;
+        if (!delayed_list_button.active)
+            return false;
+
+        ListBoxRow? selected_row = delayed_settings_listbox.get_selected_row ();
+        if (selected_row == null)
+            return false;
+
+        modifications_handler.dismiss_change (((DelayedSettingView) (!) ((!) selected_row).get_child ()).full_name);
         update ();
-
-        /* GSettings stuff */
-
-        HashTable<string, GLib.Settings> delayed_settings_hashtable = new HashTable<string, GLib.Settings> (str_hash, str_equal);
-        gsettings_keys_awaiting_hashtable.foreach_remove ((descriptor, key) => {
-                GLib.Settings? settings = delayed_settings_hashtable.lookup (key.schema_id);
-                if (settings == null)
-                {
-                    settings = new GLib.Settings (key.schema_id);
-                    ((!) settings).delay ();
-                    delayed_settings_hashtable.insert (key.schema_id, (!) settings);
-                }
-
-                if (key.planned_value == null)
-                    ((!) settings).reset (key.name);
-                else
-                    ((!) settings).set_value (key.name, (!) key.planned_value);
-                key.planned_change = false;
-
-                return true;
-            });
-
-        delayed_settings_hashtable.foreach_remove ((schema_id, schema_settings) => { schema_settings.apply (); return true; });
-
-        /* DConf stuff */
-
-        DConf.Changeset dconf_changeset = new DConf.Changeset ();
-        dconf_keys_awaiting_hashtable.foreach_remove ((descriptor, key) => {
-                dconf_changeset.set (key.full_name, key.planned_value);
-
-                if (key.planned_value == null)
-                    key.is_ghost = true;
-                key.planned_change = false;
-
-                return true;
-            });
-
-        try {
-            dconf_client.change_sync (dconf_changeset);
-        } catch (Error error) {
-            warning (error.message);
-        }
-
-        /* reload the hamburger menu */
-
-        reload ();
+        return true;
     }
 
-    [GtkCallback]
-    private void dismiss_delayed_settings ()
+    public void hide_modifications_list ()
     {
-        mode = Mode.NONE;
-        update ();
+        delayed_settings_list_popover.popdown ();
+    }
 
-        /* GSettings stuff */
+    public void toggle_modifications_list ()
+    {
+        delayed_list_button.active = !delayed_settings_list_popover.visible;
+    }
 
-        gsettings_keys_awaiting_hashtable.foreach_remove ((descriptor, key) => {
-                key.planned_change = false;
-                return true;
-            });
-
-        /* DConf stuff */
-
-        dconf_keys_awaiting_hashtable.foreach_remove ((descriptor, key) => {
-                key.planned_change = false;
-                return true;
-            });
-
-        /* reload notably key_editor_child */
-
-        reload ();
+    public bool get_modifications_list_state ()
+    {
+        return delayed_list_button.active;
     }
 
     /*\
-    * * Utilities
+    * * Modifications list population
+    \*/
+
+    private Widget delayed_setting_row_create (Object key)
+    {
+        string full_name = ((Key) key).full_name;
+        bool has_schema = key is GSettingsKey;
+        bool is_default_or_ghost = has_schema ? modifications_handler.model.is_key_default ((GSettingsKey) key)
+                                              : modifications_handler.model.is_key_ghost ((DConfKey) key);
+        Variant? planned_value = modifications_handler.get_key_planned_value (full_name);
+        string? cool_planned_value = null;
+        if (planned_value != null)
+            cool_planned_value = Key.cool_text_value_from_variant ((!) planned_value, ((Key) key).type_string);
+        string? cool_default_value = null;
+        if (has_schema)
+            cool_default_value = Key.cool_text_value_from_variant (((GSettingsKey) key).default_value, ((Key) key).type_string);
+        string cool_key_value = Key.cool_text_value_from_variant (modifications_handler.model.get_key_value ((Key) key),
+                                                                                                             ((Key) key).type_string);
+        DelayedSettingView view = new DelayedSettingView (full_name,
+                                                          is_default_or_ghost,
+                                                          cool_key_value,
+                                                          cool_planned_value,
+                                                          cool_default_value);
+
+        ListBoxRow wrapper = new ListBoxRow ();
+        wrapper.add (view);
+        if (modifications_handler.get_current_delay_mode ())
+        {
+            Variant variant = new Variant ("(ss)", full_name, has_schema ? ((GSettingsKey) key).schema_id : ".dconf");
+            wrapper.set_detailed_action_name ("ui.open-object(" + variant.print (false) + ")");
+        }
+        return wrapper;
+    }
+
+    private void delayed_setting_row_update_header (ListBoxRow row, ListBoxRow? before)
+    {
+        string row_key_name = ((DelayedSettingView) row.get_child ()).full_name;
+        bool add_location_header = false;
+        if (before == null)
+            add_location_header = true;
+        else
+        {
+            string before_key_name = ((DelayedSettingView) ((!) before).get_child ()).full_name;
+
+            if (SettingsModel.get_parent_path (row_key_name) != SettingsModel.get_parent_path (before_key_name))
+                add_location_header = true;
+        }
+
+        if (add_location_header)
+        {
+            Grid location_header = new Grid ();
+            location_header.show ();
+            location_header.orientation = Orientation.VERTICAL;
+
+            Label location_header_label = new Label (SettingsModel.get_parent_path (row_key_name));
+            location_header_label.show ();
+            location_header_label.hexpand = true;
+            location_header_label.halign = Align.START;
+
+            StyleContext context = location_header_label.get_style_context ();
+            context.add_class ("dim-label");
+            context.add_class ("bold-label");
+            context.add_class ("list-row-header");
+
+            location_header.add (location_header_label);
+
+            Separator separator_header = new Separator (Orientation.HORIZONTAL);
+            separator_header.show ();
+            location_header.add (separator_header);
+
+            row.set_header (location_header);
+        }
+        else
+        {
+            Separator separator_header = new Separator (Orientation.HORIZONTAL);
+            separator_header.show ();
+            row.set_header (separator_header);
+        }
+    }
+
+    /*\
+    * * Update
     \*/
 
     private void update ()
     {
-        if (mode == Mode.NONE)
+        GLib.ListStore modifications_list = modifications_handler.get_delayed_settings ();
+        delayed_settings_listbox.bind_model (modifications_handler.get_delayed_settings (), delayed_setting_row_create);
+        if (modifications_list.get_n_items () == 0)
+            delayed_settings_list_popover.popdown ();
+        else
+            delayed_settings_listbox.select_row ((!) delayed_settings_listbox.get_row_at_index (0));
+
+        if (modifications_handler.mode == ModificationsMode.NONE)
         {
             set_reveal_child (false);
+            apply_button.sensitive = false;
             label.set_text ("");
+            return;
         }
-        else if (mode == Mode.TEMPORARY)
+        uint total_changes_count = modifications_handler.dconf_changes_count + modifications_handler.gsettings_changes_count;
+        if (modifications_handler.mode == ModificationsMode.TEMPORARY)
         {
-            uint length = dconf_keys_awaiting_hashtable.length + gsettings_keys_awaiting_hashtable.length;
-            if (length == 0)
+            if (total_changes_count == 0)
+            {
+                apply_button.sensitive = false;
                 label.set_text (_("The value is invalid."));
-            else if (length != 1)
+            }
+            else if (total_changes_count != 1)
                 assert_not_reached ();
-            else if (behaviour == Behaviour.ALWAYS_CONFIRM_EXPLICIT)
+            else if (modifications_handler.behaviour == Behaviour.ALWAYS_CONFIRM_EXPLICIT)
+            {
+                apply_button.sensitive = true;
                 label.set_text (_("The change will be dismissed if you quit this view without applying."));
-            else if (behaviour == Behaviour.ALWAYS_CONFIRM_IMPLICIT || behaviour == Behaviour.SAFE)
+            }
+            else if (modifications_handler.behaviour == Behaviour.ALWAYS_CONFIRM_IMPLICIT || modifications_handler.behaviour == Behaviour.SAFE)
+            {
+                apply_button.sensitive = true;
                 label.set_text (_("The change will be applied on such request or if you quit this view."));
+            }
             else
                 assert_not_reached ();
             set_reveal_child (true);
         }
         else // if (mode == Mode.DELAYED)
         {
-            label.set_text (get_text (dconf_keys_awaiting_hashtable.length, gsettings_keys_awaiting_hashtable.length));
+            if (total_changes_count == 0)
+                label.set_text (_("Nothing to reset."));
+            apply_button.sensitive = total_changes_count > 0;
+            label.set_text (get_text (modifications_handler.dconf_changes_count, modifications_handler.gsettings_changes_count));
             set_reveal_child (true);
         }
     }

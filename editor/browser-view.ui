@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface domain="dconf-editor">
+  <!-- interface-requires gtk+ 3.0 -->
+  <template class="BrowserView" parent="GtkGrid">
+    <property name="orientation">vertical</property>
+    <child>
+      <object class="BrowserInfoBar" id="info_bar">
+        <property name="visible">True</property>
+      </object>
+    </child>
+    <child>
+      <object class="BrowserStack" id="current_child">
+        <property name="visible">True</property>
+      </object>
+    </child>
+  </template>
+</interface>

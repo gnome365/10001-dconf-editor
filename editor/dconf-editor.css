@@ -21,28 +21,77 @@
 */
 
 /*\
+* * bookmarks
+\*/
+
+/* no transition as it would start at popover's opening */
+
+                      .bookmarks list > row { min-height:2.6rem; }
+.small-bookmarks-rows .bookmarks list > row { min-height:1.3rem; }
+
+.small-bookmarks-rows .bookmarks list > row > grid > button.circular.flat {
+  min-height:0;
+  padding-bottom:1px;
+  padding-top:1px;
+  margin-top:-2px;
+  margin-bottom:-2px;
+}
+
+/*\
+* * pending change list popover
+\*/
+
+.delayed-settings-popover { padding:6px; }
+
+.delayed-list .list-row-header { padding:5px; padding-top:10px; }
+
+.delayed-list          > row              { padding:10px; }
+.delayed-list          > row .key-name    { padding-bottom:5px; }
+.delayed-list:dir(ltr) > row .diff-bullet { padding-left:20px; padding-right:6px; }
+.delayed-list:dir(rtl) > row .diff-bullet { padding-right:20px; padding-left:6px; }
+.delayed-list:dir(ltr) > row .value-label { padding-right:6px; }
+.delayed-list:dir(rtl) > row .value-label { padding-left:6px; }
+
+/*\
 * * lists rows height and icon
 \*/
 
 /* row height */
-                                                .keys-list          > row { transition:min-height 0.3s; } /* not for .bookmarks, as the transition will start at the popover opening */
+                                   .keys-list          > row         { transition:min-height 0.3s,
+                                                                                  margin-left 0.3s, margin-right 0.3s,
+                                                                                  padding-left 0.3s, padding-right 0.3s,
+                                                                               /* margin 0.3s,
+                                                                                  padding 0.3s, cause stuttering in the transition */
+                                                                                  border-radius 0.3s; }
+                                /* .keys-list          > row:hover,
+                                   .keys-list          > row:selected{ transition:min-height 0.3s,
+                                                                                  margin 0.3s,
+                                                                                  padding 0.3s,
+                                                                                  border-radius 0.3s; } stuttering of a single row is almost bearable */
 
-                                                .keys-list          > row,
-                                                .bookmarks     list > row { min-height:2.6rem; }
-                          .small-keys-list-rows .keys-list          > row,
-                          .small-bookmarks-rows .bookmarks     list > row { min-height:1.3rem; }
+                                   .keys-list          > .key-row    { min-height:4em; }
+                                   .keys-list          > .folder-row { min-height:2em; }
+                                   .keys-list          > row         { margin:0;      padding-top:0.25em; padding-bottom:0.25em; }
+.large-window                      .keys-list          > row         { margin:0.25em; padding-top:0;      padding-bottom:0;      }
 
-/* bookmarks */
-                          .small-bookmarks-rows .bookmarks     list > row > grid > button.circular.flat {
-                            min-height:0;
-                            padding-bottom:1px;
-                            padding-top:1px;
-                            margin-top:-2px;
-                            margin-bottom:-2px;
-                          }
+             .small-keys-list-rows .keys-list          > .key-row    { min-height:2.5em; }
+             .small-keys-list-rows .keys-list          > .folder-row { min-height:1.5em; }
+             .small-keys-list-rows .keys-list          > row         { margin:0; padding-top:0; padding-bottom:0; }
+.large-window.small-keys-list-rows .keys-list          > row         { margin:0; padding-top:0; padding-bottom:0; }
+
+    .hc-theme                      .keys-list          > row         { padding-top:0.5em; padding-bottom:0.5em; }
+    .hc-theme.large-window         .keys-list          > row         { padding-top:calc(0.25em + 1px); padding-bottom:calc(0.25em + 1px); }
+    .hc-theme.small-keys-list-rows .keys-list          > row         { padding-top:0.4em; padding-bottom:0.4em; }
+
+/* round borders for large windows */
+
+.large-window                      .keys-list          > row        { border-radius:0.5em;
+                                                                      -gtk-outline-radius:calc(0.5em - 1px); }
+.large-window.small-keys-list-rows .keys-list          > row        { border-radius:0;
+                                                                      -gtk-outline-radius:2px; /* gtk+ defaults */ }
 
 /* folder icon */
-                                                .keys-list          > row        > .folder > grid {
+                                   .keys-list          > row        > .folder > grid {
                                                   background-repeat:no-repeat;
                                                   transition:background-position 0.3s,
                                                              background-size 0.3s,
@@ -50,81 +99,94 @@
                                                              padding-right 0.3s; /* warning: ltr/rtl */
                                                 }
 
-                                                .keys-list          > row        > .folder > grid { background-image:-gtk-icontheme("folder-symbolic"); }
-                                                .keys-list          > row:active > .folder > grid { background-image:-gtk-icontheme("folder-open-symbolic"); }
-
-/*             .non-symbolic                      .keys-list          > row        > .folder > grid { background-image:-gtk-icontheme("folder"); }      */
-/*             .non-symbolic                      .keys-list          > row:active > .folder > grid { background-image:-gtk-icontheme("folder-open"); } */
+                                   .keys-list          > row        > .folder > grid { background-image:-gtk-icontheme("folder-symbolic"); }
+                                   .keys-list          > row:active > .folder > grid { background-image:-gtk-icontheme("folder-open-symbolic"); }
 
 /* visual padding */
-                                                .keys-list:dir(ltr) > row > .key    > grid { padding-left:  10px; } /* looks cool */
-                                                .keys-list:dir(rtl) > row > .key    > grid { padding-right: 10px; }
+                                   .keys-list:dir(ltr) > row > .key    > grid { padding-left: 10px; padding-right:20px; } /* looks cool */
+                                   .keys-list:dir(rtl) > row > .key    > grid { padding-right:10px; padding-left: 20px; }
+                                   .keys-list          > row > .key    > grid { transition:padding-left 0.3s, padding-right 0.3s; }
 
-                                                .keys-list:dir(ltr) > row > .folder > grid { background-position:            0.75rem  center; }
-                                                .keys-list:dir(rtl) > row > .folder > grid { background-position:calc(100% - 0.75rem) center; }
+                                   .keys-list:dir(ltr) > row > .folder > grid { background-position:            0.75rem  center; }
+                                   .keys-list:dir(rtl) > row > .folder > grid { background-position:calc(100% - 0.75rem) center; }
+
+                                   .keys-list:dir(ltr) > row > .key    > grid > :last-child { margin-left: 4em; }
+                                   .keys-list:dir(rtl) > row > .key    > grid > :last-child { margin-right:4em; }
 
 /* icon sizing */
-                                                .keys-list          > row > .folder > grid { background-size:1.5rem; }
-/*             .non-symbolic                      .keys-list          > row > .folder > grid { background-size:1.75rem; } */
-                          .small-keys-list-rows .keys-list          > row > .folder > grid,
-/*             .non-symbolic.small-keys-list-rows .keys-list          > row > .folder > grid { background-size:1rem; }    */
+                                   .keys-list          > row > .folder > grid { background-size:1.5rem; }
+             .small-keys-list-rows .keys-list          > row > .folder > grid { background-size:1rem; }
 
 /* technical padding: icon visual padding + icon size + some padding */
-                                                .keys-list:dir(ltr) > row > .folder > grid { padding-left:  3rem; }
-/*             .non-symbolic                      .keys-list:dir(ltr) > row > .folder > grid { padding-left:  3.25rem; }  */
-                          .small-keys-list-rows .keys-list:dir(ltr) > row > .folder > grid,
-/*             .non-symbolic.small-keys-list-rows .keys-list:dir(ltr) > row > .folder > grid { padding-left:  2.25rem; }  */
+                                   .keys-list:dir(ltr) > row > .folder > grid,
+                                   .keys-list:dir(ltr) > row > .key    > grid { padding-left:  3rem; }
 
-                                                .keys-list:dir(rtl) > row > .folder > grid { padding-right: 3rem; }
-/*             .non-symbolic                      .keys-list:dir(rtl) > row > .folder > grid { padding-right: 3.25rem; }  */
-                          .small-keys-list-rows .keys-list:dir(rtl) > row > .folder > grid,
-/*             .non-symbolic.small-keys-list-rows .keys-list:dir(rtl) > row > .folder > grid { padding-right: 2.25rem; }  */
+             .small-keys-list-rows .keys-list:dir(ltr) > row > .folder > grid,
+             .small-keys-list-rows .keys-list:dir(ltr) > row > .key    > grid { padding-left:  2.25rem; }
+
+                                   .keys-list:dir(rtl) > row > .folder > grid,
+                                   .keys-list:dir(rtl) > row > .key    > grid { padding-right: 3rem; }
+             .small-keys-list-rows .keys-list:dir(rtl) > row > .folder > grid,
+             .small-keys-list-rows .keys-list:dir(rtl) > row > .key    > grid { padding-right: 2.25rem; }
 
 /* technical labels placing */
-                                                .keys-list          > row                   label.key-name { transition:min-width 0.3s; }
-                                                .keys-list          > row > .key    > grid  label.key-name { min-width:     222px; }
-                                                .keys-list          > row > .folder > grid  label.key-name { min-width:calc(222px + 10px - 3rem); }
-/*             .non-symbolic                      .keys-list          > row > .folder > grid  label.key-name { min-width:calc(222px + 10px - 3.25rem); } */
-                          .small-keys-list-rows .keys-list          > row > .folder > grid  label.key-name,
-/*             .non-symbolic.small-keys-list-rows .keys-list          > row > .folder > grid  label.key-name { min-width:calc(222px + 10px - 2.25rem); } */
+                                   .keys-list          > row                   label.key-name { transition:min-width 0.3s; }
+                                   .keys-list          > row > .key    > grid  label.key-name { min-width:     222px; }
+                                   .keys-list          > row > .folder > grid  label.key-name { min-width:calc(222px + 10px - 3rem); }
+             .small-keys-list-rows .keys-list          > row > .folder > grid  label.key-name { min-width:calc(222px + 10px - 2.25rem); }
 
-.large-window                                   .keys-list          > row > .key    > grid  label.key-name { min-width:     250px; }
-.large-window                                   .keys-list          > row > .folder > grid  label.key-name { min-width:calc(250px + 10px - 3rem); }
-/*.large-window.non-symbolic                      .keys-list          > row > .folder > grid  label.key-name { min-width:calc(250px + 10px - 3.25rem); } */
-.large-window             .small-keys-list-rows .keys-list          > row > .folder > grid  label.key-name,
-/*.large-window.non-symbolic.small-keys-list-rows .keys-list          > row > .folder > grid  label.key-name { min-width:calc(250px + 10px - 2.25rem); } */
-
-                                                .keys-list          > row > .key    > grid > grid          { min-width:400px; transition:min-width 0.3s; }
-.large-window                                   .keys-list          > row > .key    > grid > grid          { min-width:450px; }
-.large-window.xl                                .keys-list          > row > .key    > grid > grid          { min-width:474px; }
-.large-window.xl.xxl                            .keys-list          > row > .key    > grid > grid          { min-width:500px; }
+.large-window                      .keys-list          > row > .key    > grid  label.key-name { min-width:     250px; }
+.large-window                      .keys-list          > row > .folder > grid  label.key-name { min-width:calc(250px + 10px - 3rem); }
+.large-window.small-keys-list-rows .keys-list          > row > .folder > grid  label.key-name { min-width:calc(250px + 10px - 2.25rem); }
 
 /* grid spacing and padding-end */
-                                                .keys-list:dir(ltr) > row  grid > label { padding-right: 0.5em; }
-                                                .keys-list:dir(rtl) > row  grid > label { padding-left:  0.5em; }
+                                   .keys-list:dir(ltr) > row  grid > label { padding-right: 0.5em; }
+                                   .keys-list:dir(rtl) > row  grid > label { padding-left:  0.5em; }
 
-/* pending change icon */
+/* key icons */
 
-                                                .keys-list          > row > .key         { transition:background-position 0.3s; }
-                                                .keys-list          > row > .key.delayed { background-image:-gtk-icontheme("document-open-recent-symbolic"); background-repeat:no-repeat; }
-                                                .keys-list          > row > .key.delayed.erase { background-image:-gtk-icontheme("user-trash-symbolic"); }
+                                   .keys-list          > row > .key         { transition:background-position 0.3s,
+                                                                                         background-size     0.3s;
+                                                                              background-repeat:no-repeat;
+                                                                              background-size:1.5rem; }
+             .small-keys-list-rows .keys-list          > row > .key         { background-size:1rem; }
 
-                                                .keys-list          > row > .key.delayed { background-size:16px; transition:background-size 0.3s; }
-                          .small-keys-list-rows .keys-list          > row > .key.delayed { background-size:12px; }
+                                   .keys-list:dir(ltr) > row > .key         { background-position:            0.75rem  center; }
+                                   .keys-list:dir(rtl) > row > .key         { background-position:calc(100% - 0.75rem) center; }
+             .small-keys-list-rows .keys-list:dir(ltr) > row > .key         { background-position:            0.75rem  center; }
+             .small-keys-list-rows .keys-list:dir(rtl) > row > .key         { background-position:calc(100% - 0.75rem) center; }
 
-                                                .keys-list:dir(ltr) > row > .key.delayed { padding-right: 28px; }
-                                                .keys-list:dir(rtl) > row > .key.delayed { padding-left:  28px; }
-                                                .keys-list:dir(ltr) > row > .key         { background-position:calc(100% - 16px) calc(1.3rem - 8px); }
-                                                .keys-list:dir(rtl) > row > .key         { background-position:            16px  calc(1.3rem - 8px); }
-                          .small-keys-list-rows .keys-list:dir(ltr) > row > .key         { background-position:calc(100% - 16px) calc(0.65rem - 5px); }
-                          .small-keys-list-rows .keys-list:dir(rtl) > row > .key         { background-position:            16px  calc(0.65rem - 5px); }
+/* icons */
+.keys-list > row >                       .key.delayed,
+.keys-list > row >             .dconf-key.key.delayed,
+.keys-list > row >  .edited.gsettings-key.key.delayed          { background-image:-gtk-icontheme("document-open-recent-symbolic"); }
+
+.keys-list > row >         .gsettings-key.key.delayed.conflict,
+.keys-list > row >  .edited.gsettings-key.key.delayed.conflict { background-image:-gtk-icontheme("document-open-recent-symbolic"); }
+
+.keys-list > row >         .gsettings-key.key.conflict,
+.keys-list > row >  .edited.gsettings-key.key.conflict         { background-image:-gtk-icontheme("dialog-warning-symbolic"); }
+.keys-list > row >         .gsettings-key.key.hard-conflict,
+.keys-list > row >  .edited.gsettings-key.key.hard-conflict    { background-image:-gtk-icontheme("dialog-error-symbolic"); }
+
+.keys-list > row >  .edited.gsettings-key.key                  { background-image:-gtk-icontheme("document-edit-symbolic"); }
+
+.keys-list > row >             .dconf-key.key                  { background-image:-gtk-icontheme("dialog-question-symbolic"); }
+.keys-list > row >       .erase.dconf-key.key.delayed          { background-image:-gtk-icontheme("user-trash-symbolic"); }
+.keys-list > row >       .erase.dconf-key.key                  { background-image:-gtk-icontheme("action-unavailable-symbolic"); }
+
+.keys-list > row >       .erase.dconf-key.key:not(.delayed) label.key-value { font-style:italic; }
+
+.keys-list > row > :not(.erase).dconf-key.key               label.key-name,
+.keys-list > row >       .erase.dconf-key.key.delayed       label.key-name,
+.keys-list > row >  .edited.gsettings-key.key               label.key-name  { font-weight:bold; }
 
 /*\
 * * pathbar
 \*/
 
-.root-button {
-  background-image:-gtk-icontheme("dconf-editor-symbolic");
+.root-button > label {
+  background-image:-gtk-icontheme("ca.desrt.dconf-editor-symbolic");
   background-position:center;
   background-size:1.1rem;
   background-repeat:no-repeat;
@@ -177,6 +239,37 @@
   border-bottom-color:@theme_selected_bg_color;
 }
 
+/* inexistent items */
+.pathbar > label,
+.pathbar > button.inexistent > label.item {
+  color:@insensitive_fg_color;
+}
+
+.pathbar > button.inexistent:hover > label.item {
+  border-bottom-color:transparent;
+}
+
+/* search changes */
+.pathbar.greyed-pathbar {
+  color:@insensitive_fg_color;
+}
+
+.pathbar.greyed-pathbar          > button.active       > .item,
+.pathbar.greyed-pathbar          > button.active:hover > .item {
+  border-bottom-color:alpha(currentColor,0.6);
+}
+
+.pathbar.greyed-pathbar:backdrop > button.active       > .item,
+.pathbar.greyed-pathbar:backdrop > button.active:hover > .item {
+  border-bottom-color:alpha(currentColor,0.4);
+}
+
+/*\
+* * lists headers
+\*/
+
+.header-label { margin:0.45em 0.75em 0.2em; font-weight:bold; }
+
 /*\
 * * properties list
 \*/
@@ -186,8 +279,9 @@
   background-color:initial;
   padding:0.3em 0;
 }
-            list.properties-list          > row {    /* TODO what? */
-  padding:0 6px; /* align on headerbar's buttons */
+
+            list.properties-list          > row {
+  padding:0;
 }
 
 /* rows usual height */
@@ -209,16 +303,31 @@
             list.properties-list:dir(ltr) > row > grid > label { padding-right:1em; }
             list.properties-list:dir(rtl) > row > grid > label { padding-left:1em; }
 
+/* key-editor-child properties */
+
+.key-editor-child-array {
+  min-height:10em;
+}
+
+.key-editor-child-array textview.view {
+  padding:0.2em 0.3em;
+}
+
+.key-editor-child-array:dir(ltr),
+.key-editor-child-entry:dir(ltr) {
+  margin-right:1em;
+}
+.key-editor-child-array:dir(rtl),
+.key-editor-child-entry:dir(rtl) {
+  margin-left:1em;
+}
+
 /*\
 * * text formating
 \*/
 
 .italic-label {
   font-style:italic;
-}
-
-.bold-label {
-  font-weight:bold;
 }
 
 .greyed-label {
@@ -232,4 +341,13 @@
 }
 .greyed-label:disabled:backdrop {
   color:@unfocused_insensitive_color;
+}
+
+.warning-label {
+  margin-right:8em;
+  margin-left:8em;
+}
+
+.big-popover {
+  font-size:144%;
 }

@@ -1,9 +1,86 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<schemalist gettext-domain='dconf'>
-  <!-- enum id="ca.desrt.dconf-editor.Themes">
-    <value value="0" nick="three-twenty-two"/>
-    <value value="1" nick="non-symbolic-keys-list"/>
-  </enum -->
+<!--
+  https://gitlab.gnome.org/GNOME/glib/blob/master/gio/gschema.dtd
+  /usr/share/glib-2.0/schemas/gschema.dtd
+-->
+<!DOCTYPE schemalist [
+  <!ELEMENT schemalist (schema|enum|flags)* >
+  <!ATTLIST schemalist gettext-domain CDATA #IMPLIED >
+
+  <!ELEMENT schema (key|child|override)* >
+  <!ATTLIST schema id             CDATA #REQUIRED
+                   path           CDATA #IMPLIED
+                   gettext-domain CDATA #IMPLIED
+                   extends        CDATA #IMPLIED
+                   list-of        CDATA #IMPLIED >
+
+  <!-- enumerated and flags types -->
+  <!-- each value element maps a nick to a numeric value -->
+  <!ELEMENT enum (value*) >
+  <!ATTLIST enum id CDATA #REQUIRED >
+
+  <!ELEMENT flags (value*) >
+  <!ATTLIST flags id CDATA #REQUIRED >
+
+  <!ELEMENT value EMPTY >
+  <!-- nick must be at least 2 characters long -->
+  <!-- value must be parsable as a 32-bit integer -->
+  <!ATTLIST value nick  CDATA #REQUIRED
+                  value CDATA #REQUIRED >
+
+  <!ELEMENT key (default|summary?|description?|range?|choices?|aliases?)* >
+  <!-- name can only contain lowercase letters, numbers and '-' -->
+  <!-- type must be a GVariant type string -->
+  <!-- enum must be the id of an enum type that has been defined earlier -->
+  <!-- flags must be the id of a flags type that has been defined earlier -->
+  <!-- exactly one of type, enum or flags must be given -->
+  <!ATTLIST key name  CDATA #REQUIRED
+                type  CDATA #IMPLIED
+                enum  CDATA #IMPLIED
+                flags CDATA #IMPLIED >
+
+  <!-- the default value is specified a a serialized GVariant,
+       i.e. you have to include the quotes when specifying a string -->
+  <!ELEMENT default (#PCDATA) >
+  <!-- the presence of the l10n attribute marks a default value for
+       translation, its value is the gettext category to use -->
+  <!-- if context is present, it specifies msgctxt to use -->
+  <!ATTLIST default l10n    (messages|time) #IMPLIED
+                    context CDATA           #IMPLIED >
+
+  <!ELEMENT summary (#PCDATA) >
+  <!ELEMENT description (#PCDATA) >
+
+  <!-- range is only allowed for keys with numeric type -->
+  <!ELEMENT range EMPTY >
+  <!-- min and max must be parseable as values of the key type and
+       min must be less than or equal to max -->
+  <!ATTLIST range min CDATA #REQUIRED
+                  max CDATA #REQUIRED >
+
+  <!-- choices is only allowed for keys with string or string array type -->
+  <!ELEMENT choices (choice+) >
+  <!-- each choice element specifies one possible value -->
+  <!ELEMENT choice EMPTY >
+  <!ATTLIST choice value CDATA #REQUIRED >
+
+  <!-- aliases is only allowed for keys with enumerated type or with choices -->
+  <!ELEMENT aliases (alias+) >
+  <!-- each alias element specifies an alias for one of the possible values -->
+  <!ELEMENT alias EMPTY >
+  <!ATTLIST alias value CDATA #REQUIRED >
+
+  <!ELEMENT child EMPTY >
+  <!ATTLIST child name   CDATA #REQUIRED
+                  schema CDATA #REQUIRED >
+
+  <!ELEMENT override (#PCDATA) >
+  <!ATTLIST override name    CDATA #REQUIRED
+                     l10n    CDATA #IMPLIED
+                     context CDATA #IMPLIED >
+]>
+
+<schemalist gettext-domain='dconf-editor'>
   <enum id="ca.desrt.dconf-editor.Behaviour">
     <value value="0" nick="unsafe"/>
     <value value="1" nick="safe"/>
@@ -11,6 +88,12 @@
     <value value="3" nick="always-confirm-explicit"/>
     <value value="4" nick="always-delay"/>
   </enum>
+  <flags id="ca.desrt.dconf-editor.RelocatableSchemasEnabledMappings">
+    <value value="1" nick="User"/>
+    <value value="2" nick="Built-in"/>
+    <value value="4" nick="Internal"/>
+    <value value="8" nick="Startup"/>
+  </flags>
   <schema id="ca.desrt.dconf-editor.Settings" path="/ca/desrt/dconf-editor/">
     <child schema="ca.desrt.dconf-editor.Demo" name="demo"/>
     <key name="window-width" type="i">
@@ -27,11 +110,6 @@
       <default>false</default>
       <summary>A flag to enable maximized mode</summary>
       <description>A flag to enable maximized mode</description>
-    </key>
-    <key name="bookmarks" type="as">
-      <default>[]</default>
-      <summary>A list of bookmarked paths</summary>
-      <description>Contains all paths bookmarked by the user as an array of strings.</description>
     </key>
     <key name="restore-view" type="b">
       <default>true</default>
@@ -58,11 +136,6 @@
       <summary>A flag to enable small rows for bookmarks list</summary>
       <description>If “true”, the bookmarks list use smaller rows.</description>
     </key>
-    <!-- key name="theme" enum="ca.desrt.dconf-editor.Themes">
-      <default>'three-twenty-two'</default>
-      <summary>The theme of the navigation list</summary>
-      <description>The themes are defined by the application, you cannot add one. The theme “three-twenty-two” will remain as close as possible to the default theme of the 3.22 release.</description>
-    </key -->
     <key name="behaviour" enum="ca.desrt.dconf-editor.Behaviour">
       <default>'always-confirm-implicit'</default>
       <summary>Change the behaviour of a key value change request</summary>
@@ -73,7 +146,45 @@
       <summary>A flag to sort keys list case-sensitively</summary>
       <description>GSettings doesn’t allow keys to use upper-case in their names, but installation paths of schemas can. If “true”, the keys list is sorted case-sensitively, with in usual order upper-case folders first.</description>
     </key>
-    <!-- TODO sort-folder-first/last/mixed ; maybe also sort-reversed, but should that one be saved between sessions if the last path is not? -->
+    <key type="b" name="mouse-use-extra-buttons">
+      <default>true</default>
+      <summary>Use “Back” and “Forward” mouse button events</summary>
+      <description>For users with mice that have buttons for “Forward” and “Back”, this key will determine if any action is taken inside of a browser window when either is pressed.</description>
+    </key>
+    <key type="i" name="mouse-back-button">
+      <default>8</default>
+      <range min="6" max="14"/>
+      <summary>Mouse button to activate the “Back” command in browser window</summary>
+      <description>For users with mice that have buttons for “Forward” and “Back”, this key will set which button activates the “Back” command in a browser window. Possible values range between 6 and 14.</description>
+    </key>
+    <key type="i" name="mouse-forward-button">
+      <default>9</default>
+      <range min="6" max="14"/>
+      <summary>Mouse button to activate the “Forward” command in browser window</summary>
+      <description>For users with mice that have buttons for “Forward” and “Back”, this key will set which button activates the “Forward” command in a browser window. Possible values range between 6 and 14.</description>
+    </key>
+    <key type="b" name="refresh-settings-schema-source">
+      <default>true</default>
+      <summary>A flag to check for added or removed schemas</summary>
+      <description>Dconf Editor can monitor if schemas are added or removed from the multiple possible locations. That’s done by checking every three seconds if the schemas list has changed. As this way to do is suboptimal, this function can be disabled by setting this flag to “false”. Note that this option will be removed when a better way to do things is found.</description>
+    </key>
+    <key name="relocatable-schemas-enabled-mappings" flags="ca.desrt.dconf-editor.RelocatableSchemasEnabledMappings">
+      <default>['User', 'Built-in', 'Internal', 'Startup']</default>
+      <summary>Enabled relocatable schema mapping facilities</summary>
+      <description>Flags for the relocatable schemas mapping facilities. “User” enables mappings defined by the “relocatable-schemas-user-paths” key; “Built-in” enables well-known mappings hardcoded into Dconf Editor; “Internal” is reserved for Dconf Editor own mappings; “Startup” is for mapping a relocatable schema from the command-line.</description>
+    </key>
+    <key name="relocatable-schemas-user-paths" type="a{ss}">
+      <default>{'ca.desrt.dconf-editor.Demo.Relocatable':'/ca/desrt/dconf-editor/Demo/relocatable/'}</default>
+      <summary>Mapping of paths to manually associated schemas</summary>
+      <description>A dictionary that maps schema IDs with path specifications. It is used to allow the user to associate a relocatable schema to certain paths. Path specifications may contain wildcards in the form of empty segments (e.g. /ca/desrt/dconf-editor//), defining possibly multiple paths. The same schema ID may be associated with multiple path specifications.</description>
+    </key>
+  </schema>
+  <schema id="ca.desrt.dconf-editor.Bookmarks">
+    <key name="bookmarks" type="as">
+      <default>[]</default>
+      <summary>A list of bookmarked paths</summary>
+      <description>Contains all paths bookmarked by the user as an array of strings.</description>
+    </key>
   </schema>
   <enum id="ca.desrt.dconf-editor.DemoEnum">
     <value value="0" nick="Red"/>
@@ -83,7 +194,7 @@
     <value value="1" nick="Green"/>
   </enum>
   <flags id="ca.desrt.dconf-editor.DemoFlags">
-    <value value="16" nick="Red"/>      <!-- TODO report bug: 0 validates... -->
+    <value value="16" nick="Red"/>      <!-- 0 validates, multiple times; https://bugzilla.gnome.org/show_bug.cgi?id=756735 -->
     <value value="4" nick="White"/>
     <value value="2" nick="Blue"/>
     <value value="8" nick="Yellow"/>
@@ -92,7 +203,9 @@
   <enum id="ca.desrt.dconf-editor.DemoWeirdEnum">
     <value value="0" nick="only-choice"/>
   </enum>
-  <schema id="ca.desrt.dconf-editor.Demo" path="/ca/desrt/dconf-editor/demo/">
+  <schema id="ca.desrt.dconf-editor.Demo" path="/ca/desrt/dconf-editor/Demo/">
+    <child schema="ca.desrt.dconf-editor.Demo.Conflict1" name="conflict1"/>
+    <child schema="ca.desrt.dconf-editor.Demo.Conflict2" name="conflict2"/>
     <key name="boolean" type="b">
       <default>true</default>
       <summary>A boolean, type ‘b’</summary>
@@ -121,7 +234,7 @@
     <key name="dbus-handle" type="h">
       <default>0</default>
       <summary>A D-Bus handle type, type ‘h’</summary>
-      <description>The handle type is a 32bit signed integer value that is, by convention, used as an index into an array of file descriptors that are sent alongside a D-Bus message.
+      <description>The handle type is a 32-bit signed integer value that is, by convention, used as an index into an array of file descriptors that are sent alongside a D-Bus message.
 
 If you are not interacting with D-Bus, then there is no reason to make use of this type.</description>
     </key>
@@ -159,7 +272,7 @@ If you are not interacting with D-Bus, then there is no reason to make use of th
     <key name="integer-16-signed" type="n">
       <default>-32768</default>
       <summary>A short integer, type ‘n’</summary>
-      <description>A 16bit signed integer. See also the “integer-16-unsigned” key.</description>
+      <description>A 16-bit signed integer. See also the “integer-16-unsigned” key.</description>
     </key>
     <key name="flags" flags="ca.desrt.dconf-editor.DemoFlags">
       <default>["Blue", "White", "Red"]</default>
@@ -169,27 +282,27 @@ If you are not interacting with D-Bus, then there is no reason to make use of th
     <key name="integer-16-unsigned" type="q">
       <default>65535</default>
       <summary>An unsigned short integer, type ‘q’</summary>
-      <description>A 16bit unsigned integer. See also the “integer-16-signed” key.</description>
+      <description>A 16-bit unsigned integer. See also the “integer-16-signed” key.</description>
     </key>
     <key name="integer-32-signed" type="i">
       <default>-2147483648</default>
       <summary>An usual integer, type ‘i’</summary>
-      <description>A 32bit signed integer. See also the “integer-32-unsigned” key.</description>
+      <description>A 32-bit signed integer. See also the “integer-32-unsigned” key.</description>
     </key>
     <key name="integer-32-unsigned" type="u">
       <default>4294967295</default>
       <summary>An unsigned usual integer, type ‘u’</summary>
-      <description>A 32bit unsigned integer. See also the “integer-32-signed” key.</description>
+      <description>A 32-bit unsigned integer. See also the “integer-32-signed” key.</description>
     </key>
     <key name="integer-64-signed" type="x">
       <default>-9223372036854775808</default>
       <summary>A long integer, type ‘x’</summary>
-      <description>A 64bit signed integer. See also the “integer-64-unsigned” key.</description>
+      <description>A 64-bit signed integer. See also the “integer-64-unsigned” key.</description>
     </key>
     <key name="integer-64-unsigned" type="t">
       <default>18446744073709551615</default>
       <summary>An unsigned long integer, type ‘t’</summary>
-      <description>A 64bit unsigned integer. See also the “integer-64-signed” key.</description>
+      <description>A 64-bit unsigned integer. See also the “integer-64-signed” key.</description>
     </key>
     <!-- TODO add a nullable-(unsigned-)integer -->
     <key name="number-with-range" type="i">
@@ -201,7 +314,7 @@ If you are not interacting with D-Bus, then there is no reason to make use of th
     <key name="pair-of-integers" type="(ii)">
       <default>(800, 600)</default>
       <summary>A custom type, here ‘(ii)’</summary>
-      <description>Dconf Editor lets you edit any settings type supported by GSettings, falling back on a string entry when it doesn’t have a better way to do. Here is a tuple of two 32bit signed integers.</description>
+      <description>Dconf Editor lets you edit any settings type supported by GSettings, falling back on a string entry when it doesn’t have a better way to do. Here is a tuple of two 32-bit signed integers.</description>
     </key>
     <key name="string" type="s">
       <default>'Lorem ipsum dolor sit amet, consectetur adipiscing elit.'</default>
@@ -228,6 +341,80 @@ If you are not interacting with D-Bus, then there is no reason to make use of th
       <range min="5" max="5"/>
       <summary>A 1-choice integer value</summary>
       <description>A range could limit an integer key to only allow one value, but that’s probably an error. Dconf Editor warns you in that case.</description>
+    </key>
+  </schema>
+  <schema id="ca.desrt.dconf-editor.DemoEmpty" path="/ca/desrt/dconf-editor/Demo/Empty/">
+  </schema>
+  <schema id="ca.desrt.dconf-editor.Demo.Relocatable">
+    <key name="boolean" type="b">
+      <default>false</default>
+      <summary>A boolean, type ‘b’</summary>
+      <description>An usual boolean value, defined by a relocatable schema.</description>
+    </key>
+    <key name="integer" type="i">
+      <default>4</default>
+      <summary>An usual integer, type ‘i’</summary>
+      <description>A 32-bit signed integer, defined by a relocatable schema.</description>
+    </key>
+    <key name="flags" flags="ca.desrt.dconf-editor.DemoFlags">
+      <default>["Blue", "White", "Red"]</default>
+      <summary>Flags: choose-colors-you-love</summary>
+      <description>Flags could be set by the “enum” attribute.</description>
+    </key>
+  </schema>
+  <schema id="ca.desrt.dconf-editor.Demo.Conflict1" path="/ca/desrt/dconf-editor/Demo/Conflict/">
+    <key name="a-non-conflicting-key" type="b">
+      <default>true</default>
+      <summary>A normal non-conflicting key from Conflict1</summary>
+      <description>This key is a test for multiple schemas in the same path with conflicting keys. Non-conflicting keys should have no issues.</description>
+    </key>
+    <key name="default-value-conflict" type="i">
+      <default>1</default>
+      <summary>Conflicting key defaulting to “1” that should give an error</summary>
+      <description>This key is a test for multiple schemas in the same path with conflicting keys. It shouldn’t be editable as a key mapped to the same path has a different default value.</description>
+    </key>
+    <key name="range-conflict" type="u">
+      <default>0</default>
+      <summary>Conflicting key with no range that should give an error</summary>
+      <description>This key is a test for multiple schemas in the same path with conflicting keys. It shouldn’t be editable as a key mapped to the same path has a different range.</description>
+    </key>
+    <key name="type-conflict" type="s">
+      <default>'test'</default>
+      <summary>A (simple) string conflicting key that should give a error</summary>
+      <description>This key is a test for multiple schemas in the same path with conflicting keys. It shouldn’t be editable as a key mapped to the same path has a different type.</description>
+    </key>
+    <key name="warning-similar" type="b">
+      <default>true</default>
+      <summary>Conflicting key from Conflict1 that should give a warning</summary>
+      <description>This key is a test for multiple schemas in the same path with conflicting keys. It can be edited, since the types are compatible, but it is still an issue.</description>
+    </key>
+  </schema>
+  <schema id="ca.desrt.dconf-editor.Demo.Conflict2" path="/ca/desrt/dconf-editor/Demo/Conflict/">
+    <key name="another-non-conflicting-key" type="b">
+      <default>true</default>
+      <summary>A normal non-conflicting key from Conflict2</summary>
+      <description>This key is a test for multiple schemas in the same path with conflicting keys. Non-conflicting keys should have no issues.</description>
+    </key>
+    <key name="default-value-conflict" type="i">
+      <default>2</default>
+      <summary>Conflicting key defaulting to “2” that should give an error</summary>
+      <description>This key is a test for multiple schemas in the same path with conflicting keys. It shouldn’t be editable as a key mapped to the same path has a different default value.</description>
+    </key>
+    <key name="range-conflict" type="u">
+      <default>0</default>
+      <range min="0" max="5"/>
+      <summary>Conflicting key with range 0~5 that should give an error</summary>
+      <description>This key is a test for multiple schemas in the same path with conflicting keys. It shouldn’t be editable as a key mapped to the same path has a different range.</description>
+    </key>
+    <key name="type-conflict" type="ms">
+      <default>'test'</default>
+      <summary>A nullable-string conflicting key that should give an error</summary>
+      <description>This key is a test for multiple schemas in the same path with conflicting keys. It shouldn’t be editable as a key mapped to the same path has a different type.</description>
+    </key>
+    <key name="warning-similar" type="b">
+      <default>true</default>
+      <summary>Conflicting key from Conflict2 that should give a warning</summary>
+      <description>This key is a test for multiple schemas in the same path with conflicting keys. It can be edited, since the types are compatible, but it is still an issue.</description>
     </key>
   </schema>
 </schemalist>

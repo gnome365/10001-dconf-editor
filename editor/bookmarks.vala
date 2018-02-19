@@ -18,7 +18,7 @@
 using Gtk;
 
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/bookmarks.ui")]
-public class Bookmarks : MenuButton, PathElement
+public class Bookmarks : MenuButton
 {
     [GtkChild] private ListBox bookmarks_list_box;
     [GtkChild] private Popover bookmarks_popover;
@@ -27,58 +27,120 @@ public class Bookmarks : MenuButton, PathElement
     [GtkChild] private Switch bookmarked_switch;
 
     private string current_path = "/";
-    public void set_path (string path)
-    {
-        if (current_path != path)
-            current_path = path;
-        update_icon_and_switch ();
-    }
 
-    public string schema_id { get; construct; }
+    private string schema_id = "ca.desrt.dconf-editor.Bookmarks";   // TODO move in a library
+    public string schema_path { private get; construct; }
     private GLib.Settings settings;
-
-    private ulong switch_active_handler = 0;
 
     construct
     {
-        settings = new GLib.Settings (schema_id);
+        install_action_entries ();
 
-        switch_active_handler = bookmarked_switch.notify ["active"].connect (switch_changed_cb);
+        settings = new GLib.Settings.with_path (schema_id, schema_path);
+
         ulong bookmarks_changed_handler = settings.changed ["bookmarks"].connect (() => {
                 update_bookmarks ();
                 update_icon_and_switch ();
             });
 
         update_bookmarks ();
-        bookmarked_switch.grab_focus ();
+        ulong clicked_handler = clicked.connect (() => bookmarked_switch.grab_focus ());
 
-        destroy.connect (() => settings.disconnect (bookmarks_changed_handler));
-        bookmarked_switch.destroy.connect (() => bookmarked_switch.disconnect (switch_active_handler));
+        destroy.connect (() => {
+                settings.disconnect (bookmarks_changed_handler);
+                disconnect (clicked_handler);
+            });
     }
+
+    /*\
+    * * Public calls
+    \*/
+
+    public void set_path (ViewType type, string path)
+    {
+        if (type == ViewType.SEARCH)
+            return;
+
+        if (current_path != path)
+            current_path = path;
+        update_icon_and_switch ();
+    }
+
+    // for search
+    public string [] get_bookmarks ()
+    {
+        return settings.get_strv ("bookmarks");
+    }
+
+    // keyboard call
+    public void set_bookmarked (string path, bool new_state)
+    {
+        if (path == current_path && bookmarked_switch.get_active () == new_state)
+            return;
+
+        if (new_state)
+            append_bookmark (path);
+        else
+            remove_bookmark (path);
+    }
+
+    /*\
+    * * Action entries
+    \*/
+
+    private void install_action_entries ()
+    {
+        SimpleActionGroup action_group = new SimpleActionGroup ();
+        action_group.add_action_entries (action_entries, this);
+        insert_action_group ("bookmarks", action_group);
+    }
+
+    private const GLib.ActionEntry [] action_entries =
+    {
+        {   "bookmark",   bookmark, "s" },
+        { "unbookmark", unbookmark, "s" }
+    };
+
+    private void bookmark (SimpleAction action, Variant? path_variant)
+        requires (path_variant != null)
+    {
+        append_bookmark (((!) path_variant).get_string ());
+    }
+
+    private void unbookmark (SimpleAction action, Variant? path_variant)
+        requires (path_variant != null)
+    {
+        remove_bookmark (((!) path_variant).get_string ());
+    }
+
+    /*\
+    * * Bookmarks management
+    \*/
 
     private void update_icon_and_switch ()
     {
+        Variant variant = new Variant.string (current_path);
         if (current_path in settings.get_strv ("bookmarks"))
         {
             if (bookmarks_icon.icon_name != "starred-symbolic")
                 bookmarks_icon.icon_name = "starred-symbolic";
             update_switch (true);
+            bookmarked_switch.set_detailed_action_name ("bookmarks.unbookmark(" + variant.print (false) + ")");
         }
         else
         {
             if (bookmarks_icon.icon_name != "non-starred-symbolic")
                 bookmarks_icon.icon_name = "non-starred-symbolic";
             update_switch (false);
+            bookmarked_switch.set_detailed_action_name ("bookmarks.bookmark(" + variant.print (false) + ")");
         }
     }
     private void update_switch (bool bookmarked)
-        requires (switch_active_handler != 0)
     {
         if (bookmarked == bookmarked_switch.active)
             return;
-        SignalHandler.block (bookmarked_switch, switch_active_handler);
+        bookmarked_switch.set_detailed_action_name ("ui.empty('')");
         bookmarked_switch.active = bookmarked;
-        SignalHandler.unblock (bookmarked_switch, switch_active_handler);
     }
 
     private void update_bookmarks ()
@@ -86,74 +148,69 @@ public class Bookmarks : MenuButton, PathElement
         bookmarks_list_box.@foreach ((widget) => widget.destroy ());
 
         string [] bookmarks = settings.get_strv ("bookmarks");
+        string [] unduplicated_bookmarks = new string [0];
         foreach (string bookmark in bookmarks)
         {
+            if (bookmark in unduplicated_bookmarks)
+                continue;
+            unduplicated_bookmarks += bookmark;
+
             Bookmark bookmark_row = new Bookmark (bookmark);
-            ulong destroy_button_clicked_handler = bookmark_row.destroy_button.clicked.connect (() => remove_bookmark (bookmark));
-            bookmark_row.destroy_button.destroy.connect (() => bookmark_row.destroy_button.disconnect (destroy_button_clicked_handler));
+            if (SettingsModel.is_key_path (bookmark))
+            {
+                Variant variant = new Variant ("(ss)", bookmark, "");
+                bookmark_row.set_detailed_action_name ("ui.open-object(" + variant.print (false) + ")");    // TODO save context
+            }
+            else
+            {
+                Variant variant = new Variant.string (bookmark);
+                bookmark_row.set_detailed_action_name ("ui.open-folder(" + variant.print (false) + ")");
+            }
             bookmark_row.show ();
             bookmarks_list_box.add (bookmark_row);
         }
+        ListBoxRow? first_row = bookmarks_list_box.get_row_at_index (0);
+        if (first_row != null)
+            bookmarks_list_box.select_row ((!) first_row);
     }
 
-    private void switch_changed_cb ()
+    private void append_bookmark (string path)
     {
-        bookmarks_popover.closed ();
+        bookmarks_popover.closed ();    // if the popover is visible, the size of the listbox could change 1/2
 
         string [] bookmarks = settings.get_strv ("bookmarks");
-
-        if (!bookmarked_switch.get_active ())
-            remove_bookmark (current_path);
-        else if (!(current_path in bookmarks))
+        if (!(path in bookmarks))
         {
-            bookmarks += current_path;
+            bookmarks += path;
             settings.set_strv ("bookmarks", bookmarks);
         }
     }
 
-    public void set_bookmarked (bool new_state)
-    {
-        if (bookmarked_switch.get_active () != new_state)
-            bookmarked_switch.set_active (new_state);
-    }
-
-    [GtkCallback]
-    private void bookmark_activated_cb (ListBoxRow list_box_row)
-    {
-        bookmarks_popover.closed ();
-        string bookmark = ((Bookmark) list_box_row.get_child ()).bookmark_name;
-        request_path (bookmark);
-    }
-
     private void remove_bookmark (string bookmark_name)
     {
-        bookmarks_popover.closed ();
+        bookmarks_popover.closed ();    // if the popover is visible, the size of the listbox could change 2/2
+
         string [] old_bookmarks = settings.get_strv ("bookmarks");
         if (!(bookmark_name in old_bookmarks))
             return;
         string [] new_bookmarks = new string [0];
         foreach (string bookmark in old_bookmarks)
-            if (bookmark != bookmark_name)
+            if (bookmark != bookmark_name && !(bookmark in new_bookmarks))
                 new_bookmarks += bookmark;
         settings.set_strv ("bookmarks", new_bookmarks);
     }
 }
 
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/bookmark.ui")]
-private class Bookmark : Grid
+private class Bookmark : ListBoxRow
 {
-    public string bookmark_name { get; construct; }
-
     [GtkChild] private Label bookmark_label;
-    [GtkChild] public Button destroy_button;
-
-    construct
-    {
-        bookmark_label.set_label (bookmark_name);
-    }
+    [GtkChild] private Button destroy_button;
 
     public Bookmark (string bookmark_name)
     {
-        Object (bookmark_name: bookmark_name);
+        bookmark_label.set_label (bookmark_name);
+        Variant variant = new Variant.string (bookmark_name);
+        destroy_button.set_detailed_action_name ("bookmarks.unbookmark(" + variant.print (false) + ")");
     }
 }

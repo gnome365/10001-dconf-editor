@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<interface>
+<interface domain="dconf-editor">
   <!-- interface-requires gtk+ 3.0 -->
   <template class="DConfWindow" parent="GtkApplicationWindow">
     <property name="visible">False</property>
     <property name="title" translatable="yes">dconf Editor</property>
-    <property name="height-request">550</property>
-    <property name="width-request">770</property>
-    <signal name="show" handler="on_show"/>
+    <property name="height-request">420</property>
+    <property name="width-request">630</property>
     <signal name="key-press-event" handler="on_key_press_event"/>
+    <signal name="button-press-event" handler="on_button_press_event"/>
     <signal name="window-state-event" handler="on_window_state_event"/>
     <signal name="size-allocate" handler="on_size_allocate"/>
     <signal name="destroy" handler="on_destroy"/>
@@ -20,27 +20,12 @@
         <property name="show-close-button">True</property>
         <property name="has-subtitle">False</property>
         <child>
-          <object class="PathBar" id="pathbar">
-            <property name="visible">True</property>
-            <property name="valign">center</property>
-            <signal name="request_path" handler="request_path"/>
-          </object>
-          <packing>
-            <property name="pack-type">start</property>
-          </packing>
-        </child>
-        <child type="title">
-          <object class="GtkBox">
-            <property name="visible">False</property>
-          </object>
-        </child>
-        <child>
           <object class="GtkMenuButton" id="info_button">
             <property name="visible">True</property>
             <property name="valign">center</property>
             <property name="focus-on-click">False</property>
-            <accelerator key="F10" signal="clicked"/>
-            <signal name="clicked" handler="on_menu_button_clicked"/>
+            <property name="sensitive" bind-source="search-toggle" bind-property="active" bind-flags="sync-create|invert-boolean"/>
+            <accelerator key="F10" signal="clicked"/> <!-- TODO report bug: property binding has to be defined before accelerator -->
             <style>
               <class name="image-button"/>
             </style>
@@ -63,11 +48,11 @@
           </packing>
         </child>
         <child>
-          <object class="GtkToggleButton">
+          <object class="GtkToggleButton" id="search-toggle">
             <property name="visible">True</property>
             <property name="valign">center</property>
-            <!-- TODO <property name="focus-on-click">False</property> does not work here because of explicit focus grab -->
-            <property name="active" bind-source="registry_view" bind-property="show-search-bar" bind-flags="bidirectional|sync-create"/>
+            <property name="active" bind-source="search_bar" bind-property="search-mode-enabled" bind-flags="bidirectional">False</property>
+            <property name="focus-on-click">False</property>
             <!-- <accelerator key="F" signal="toggled" modifiers="GDK_CONTROL_MASK"/> TODO -->
             <style>
               <class name="image-button"/>
@@ -95,9 +80,8 @@
             <property name="visible">True</property>
             <property name="valign">center</property>
             <property name="focus-on-click">False</property>
-            <property name="schema-id">ca.desrt.dconf-editor.Settings</property>
-            <signal name="clicked" handler="on_menu_button_clicked"/>
-            <signal name="request_path" handler="request_path"/>
+            <property name="schema-path">/ca/desrt/dconf-editor/</property>
+            <property name="sensitive" bind-source="search-toggle" bind-property="active" bind-flags="sync-create|invert-boolean"/>
             <!-- <accelerator key="B" signal="activate" modifiers="GDK_CONTROL_MASK"/> TODO -->
             <style>
               <class name="image-button"/> <!-- TODO https://bugzilla.gnome.org/show_bug.cgi?id=756731 -->
@@ -107,15 +91,100 @@
             <property name="pack-type">end</property>
           </packing>
         </child>
+        <child type="title">
+          <object class="PathBar" id="pathbar">
+            <property name="visible">True</property>
+            <property name="hexpand">True</property>
+            <property name="valign">center</property>
+          </object>
+          <packing>
+            <property name="pack-type">start</property>
+          </packing>
+        </child>
       </object>
     </child>
     <child>
       <object class="GtkOverlay">
         <property name="visible">True</property>
         <child>
-          <object class="RegistryView" id="registry_view">
+          <object class="GtkGrid">
             <property name="visible">True</property>
-            <signal name="request_path" handler="request_path"/>
+            <property name="orientation">vertical</property>
+            <child>
+              <object class="GtkRevealer">
+                <property name="visible">True</property>
+                <property name="reveal-child" bind-source="search_bar" bind-property="search-mode-enabled" bind-flags="bidirectional">False</property>
+                <child>
+                  <object class="GtkSearchBar" id="search_bar">
+                    <property name="visible">True</property>
+                    <property name="search-mode-enabled">False</property>
+                    <property name="show-close-button">False</property>
+                    <child>
+                      <object class="GtkBox"> <!-- https://bugzilla.gnome.org/show_bug.cgi?id=769876 -->
+                        <property name="visible">True</property>
+                        <property name="orientation">horizontal</property>
+                        <style>
+                          <class name="linked"/>
+                        </style>
+                        <child>
+                          <object class="GtkSearchEntry" id="search_entry">
+                            <property name="visible">True</property>
+                            <property name="width-request">350</property>
+                            <signal name="search-changed" handler="search_changed"/>
+                            <signal name="stop-search" handler="search_cancelled"/>
+                          </object>
+                        </child>
+                        <!-- child>
+                          <object class="GtkButton" id="search_options_button">
+                            <property name="visible">False</property>
+                            <property name="sensitive" bind-source="search_bar" bind-property="search-mode-enabled"/>
+                            <child>
+                              <object class="GtkImage">
+                                <property name="visible">True</property>
+                                <property name="icon-name">pan-down-symbolic</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child -->
+                        <child>
+                          <object class="GtkButton">
+                            <property name="visible">True</property>
+                            <property name="action-name">ui.reload-search</property>
+                            <style>
+                              <class name="image-button"/>
+                              <class name="suggested-action"/>
+                            </style>
+                            <child internal-child="accessible">
+                              <object class="AtkObject">
+                                <property name="AtkObject::accessible-name" translatable="yes">Refresh</property>
+                                <property name="AtkObject::accessible-description" translatable="yes">Refresh search results</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkImage">
+                                <property name="visible">True</property>
+                                <property name="icon-name">view-refresh-symbolic</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+             </object>
+            </child>
+            <child>
+              <object class="BrowserView" id="browser_view">
+                <property name="visible">True</property>
+                <property name="vexpand">True</property>
+              </object>
+            </child>
+            <child>
+              <object class="ModificationsRevealer" id="revealer">
+                <property name="visible">True</property>
+              </object>
+            </child>
           </object>
         </child>
         <child type="overlay">
@@ -143,10 +212,10 @@
                         <property name="visible">True</property>
                         <property name="focus-on-click">False</property>
                         <property name="relief">none</property>
+                        <property name="action-name">ui.hide-notification</property>
                         <style>
                           <class name="image-button"/>
                         </style>
-                        <signal name="clicked" handler="hide_notification"/>
                         <child>
                           <object class="GtkImage">
                             <property name="visible">True</property>

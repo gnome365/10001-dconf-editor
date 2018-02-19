@@ -1,0 +1,15 @@
+# List of source files that should *not* be translated.
+# Please keep this file sorted alphabetically.
+editor/browser-view.c
+editor/dconf-editor.c
+editor/dconf-model.c
+editor/dconf-view.c
+editor/dconf-window.c
+editor/delayed-setting-view.c
+editor/key-list-box-row.c
+editor/modifications-revealer.c
+editor/pathbar.c
+editor/registry-info.c
+editor/registry-search.c
+editor/registry-view.c
+editor/setting-object.c
