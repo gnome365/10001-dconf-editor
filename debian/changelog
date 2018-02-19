@@ -1,3 +1,9 @@
+dconf-editor (3.27.91-1) UNRELEASED; urgency=medium
+
+  * New upstream development release (Closes: #704164)
+
+ -- Jeremy Bicha <jbicha@debian.org>  Mon, 19 Feb 2018 14:54:14 -0500
+
 dconf-editor (3.26.2-3) unstable; urgency=medium
 
   * Update Vcs fields for migration to https://salsa.debian.org/
