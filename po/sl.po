@@ -9,8 +9,8 @@ msgstr ""
 "Project-Id-Version: dconf master\n"
 "Report-Msgid-Bugs-To: https://bugzilla.gnome.org/enter_bug.cgi?product=dconf-"
 "editor&keywords=I18N+L10N&component=general\n"
-"POT-Creation-Date: 2017-10-08 19:43+0000\n"
-"PO-Revision-Date: 2017-10-09 20:47+0200\n"
+"POT-Creation-Date: 2017-08-28 14:54+0200\n"
+"PO-Revision-Date: 2017-08-28 15:05+0200\n"
 "Last-Translator: Matej Urbančič <mateju@svn.gnome.org>\n"
 "Language-Team: Slovenian GNOME Translation Team <gnome-si@googlegroups.com>\n"
 "Language: sl_SI\n"
@@ -20,7 +20,7 @@ msgstr ""
 "Plural-Forms: nplurals=4; plural=(n%100==1 ? 1 : n%100==2 ? 2 : n%100==3 || n"
 "%100==4 ? 3 : 0);\n"
 "X-Poedit-SourceCharset: utf-8\n"
-"X-Generator: Poedit 2.0.4\n"
+"X-Generator: Poedit 2.0.1\n"
 
 #: editor/bookmarks.ui:19
 msgid "Bookmark this Location"
@@ -114,11 +114,6 @@ msgstr "Neposredno urejanje celotne podatkovne zbirke nastavitev"
 #: editor/ca.desrt.dconf-editor.desktop.in:7
 msgid "settings;configuration;"
 msgstr "nastavitve;konfiguracija;sistem;prilagajanje;"
-
-#. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
-#: editor/ca.desrt.dconf-editor.desktop.in:15
-msgid "dconf-editor"
-msgstr "Urejevalnik Dconf"
 
 #: editor/ca.desrt.dconf-editor.gschema.xml:18
 msgid "The width of the window"
@@ -241,6 +236,34 @@ msgstr ""
 "V okolju GSettings uporaba velikih črk v imenih ključev ni dovoljena, za "
 "namestitvene poti shem pa to ni omejitev. Izbrana možnost omogoča, da bo "
 "seznam ključev razvrščen upoštevajoč velikost črk, z velikimi spredaj."
+
+#: editor/ca.desrt.dconf-editor.gschema.xml:85
+msgid "Mouse button to activate the “Back” command in browser window"
+msgstr "Gumb miške za izvršitev ukaza »nazaj« v brskalniku."
+
+#: editor/ca.desrt.dconf-editor.gschema.xml:86
+msgid ""
+"For users with mice that have buttons for “Forward” and “Back”, this key "
+"will set which button activates the “Back” command in a browser window. "
+"Possible values range between 6 and 14."
+msgstr ""
+"Za uporabnike, ki imajo na miški gumba »naprej« in »nazaj«, možnost določi, "
+"kateri gumb bo prevzel ukaz »nazaj« v oknu brskalnika. Mogoče vrednosti so "
+"med 6 in 14."
+
+#: editor/ca.desrt.dconf-editor.gschema.xml:91
+msgid "Mouse button to activate the “Forward” command in browser window"
+msgstr "Gumb miške za izvršitev ukaza »naprej« v brskalniku."
+
+#: editor/ca.desrt.dconf-editor.gschema.xml:92
+msgid ""
+"For users with mice that have buttons for “Forward” and “Back”, this key "
+"will set which button activates the “Forward” command in a browser window. "
+"Possible values range between 6 and 14."
+msgstr ""
+"Za uporabnike, ki imajo na miški gumba »naprej« in »nazaj«, možnost določi, "
+"kateri gumb bo prevzel ukaz »naprej« v oknu brskalnika. Mogoče vrednosti so "
+"med 6 in 14."
 
 #: editor/ca.desrt.dconf-editor.gschema.xml:98
 msgid "A boolean, type ‘b’"

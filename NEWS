@@ -1,19 +1,111 @@
-dconf-editor 3.26.2
+dconf-editor 3.27.91
 =====================
 
-This stable release mainly contains a small correction of C generated code, that
-has been also backported in other branches. Also, some translations are updated.
+Random schedule is random, that’s a beta release. :) I didn’t publish 3.27.4, as
+it would have needed a Gtk+ 3.22.27 release and as there was so many big changes
+planned in the code that releasing a snapshot would have been quite meaningless.
+So have a look also to the 3.27.4 news!
+
+As planned, the code changed a lot this last month, and that will help in future
+developments; but that is not visible to the user of course. There has been many
+attention given to details, like hiding boolean switches from keys list when the
+delay mode is activated, ensuring all ellipsize correctly, selecting the current
+row when entering search mode, etc. Schemas containing neither keys nor children
+are not displayed anymore but emit a warning at application startup instead. The
+transitions also look smooth using HighContrast theme.
+
+The big thing is probably the handling of multiple schemas installed at the same
+path, and the new keys list organisation by schema. The first looks certainly as
+a corner-case, but not handling that was a sad proof of the fragility of the way
+the application was displaying keys, and I’m happy it’s now fixed. The second is
+possibly something that will help a bit users to understand the structure of the
+settings internals, and that’s always a good thing. Sorting folders first option
+has been of course removed, as that’s the default now.
+
+Hope we’re good now for an incredible 3.28 release in March! :)
+
+Translations updated:
+  Finnish: Jiri Grönroos
+  Friulian: Fabio Tomat
+  Galician: Fran Dieguez
+  Hungarian: Balázs Meskó and Balázs Úr
+  Indonesian: Kukuh Syafaat and Andika Triwidada
+  Lithuanian: Aurimas Černius
+  Polish: Piotr Drąg
+  Brazilian Portuguese: Rafael Fontenelle
+  Spanish: Daniel Mustieles
+
+dconf-editor 3.27.4
+=====================
+
+Various UI improvements, including icons next to edited keys, and the limitation
+of the content in infobar. The underlying model has also been improved a little.
+The experimental code that was causing crashes in some build conditions has been
+removed. Also, the actions that were accessible via dbus have been made private.
+The command-line has been a little bit reworked, with an experimental completion
+available, and the manpage updated.
+
+Translations updated:
+  Czech: Marek Černocký
+  Friulian: Fabio Tomat
+  German: Tim Sabsch
+  Indonesian: Kukuh Syafaat
+  Italian: Gianvito Cavasoli
+  Spanish: Daniel Mustieles
+
+dconf-editor 3.27.3
+=====================
+
+Big release. There’s a new developer, Davi da Silva Böger, and things are moving
+faster, finally. Great. :)
+
+The main UI has been redesigned. The search is now dynamic and looks great; even
+if search results could be improved, this function will probably already be more
+useful than what was there previously. Relocatable schemas are now handled; that
+has been possible by adding an internal list of known mappings, and offering the
+user a settings to add custom ones. Please, test.
+
+Some little more things for users: the “back” and “forward” buttons of mice that
+have some could now be used; you can now open dconf-editor to a given path or to
+the path where a given schema is mapped using command-line; there’s an option to
+sort folder first (or last); HighContrast theme has been tested with new design;
+edition of values of type “double” is fixed; keys of the “string array” type are
+not anymore edited with a single-line entry; etc.
+
+As you can imagine, many things have changed internally. This release includes a
+(recently pushed) patch known to break the handling of some corner-cases; if you
+hit one of these, please report bug, it will help. And other changes are coming.
+
+Packagers should be aware also that the gettext domain changed, and that there’s
+a patch included that has been reported to make the build in some quite specific
+conditions crashy; if you are in this situation, please comment on the bugzilla.
+
+Translations updated:
+  Czech: Marek Cernocky
+  French: Charles Monzat
+  Friulian: Fabio Tomat
+  German: Mario Blättermann
+  Indonesian: Kukuh Syafaat
+  Nepali: Pawan Chitrakar
+  Norwegian bokmål: Kjartan Maraas
+  Spanish: Daniel Mustieles
+  Turkish: Muhammet Kara
+
+dconf-editor 3.27.1
+=====================
+
+The main change in this (unstable) release is the switch from Autotools to Meson
+for a faster build. Thanks for testing and reporting every bug that’s related to
+this important change (or to any other thing :) of course). And you can now open
+dconf-editor to a path given on the commandline.
 
 Translations updated:
   Catalan (Valencian): Xavi Ivars
-  French: Charles Monzat
   Friulian: Fabio Tomat
   Indonesian: Kukuh Syafaat
   Italian: Milo Casagrande
   Lithuanian: Aurimas Černius
-  Nepali: Pawan Chitrakar
   Brazilian Portuguese: Fábio Nogueira
-  Slovenian: Matej Urbančič
 
 dconf-editor 3.26.1
 =====================

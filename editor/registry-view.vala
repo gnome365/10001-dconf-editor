@@ -18,321 +18,290 @@
 using Gtk;
 
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/registry-view.ui")]
-class RegistryView : Grid, PathElement
+private abstract class RegistryList : Grid, BrowsableView
 {
-    public string current_path { get; private set; }
-    public bool show_search_bar { get; set; }
-    public Behaviour behaviour { get; set; }
+    [GtkChild] protected ListBox key_list_box;
+    [GtkChild] protected RegistryPlaceholder placeholder;
+    [GtkChild] private ScrolledWindow scrolled;
 
-    private GLib.Settings application_settings = new GLib.Settings ("ca.desrt.dconf-editor.Settings");
-    [GtkChild] private Revealer need_reload_warning_revealer;
+    protected GLib.ListStore list_model = new GLib.ListStore (typeof (SettingObject));
 
-    private SettingsModel model = new SettingsModel ();
-    [GtkChild] private TreeView dir_tree_view;
-    [GtkChild] private TreeSelection dir_tree_selection;
+    protected GLib.ListStore rows_possibly_with_popover = new GLib.ListStore (typeof (ClickableListBoxRow));
 
-    [GtkChild] private Stack stack;
-    [GtkChild] private RegistryInfo properties_view;
-
-    [GtkChild] private ListBox key_list_box;
-    private GLib.ListStore? key_model = null;
-
-    private GLib.ListStore rows_possibly_with_popover = new GLib.ListStore (typeof (ClickableListBoxRow));
-
-    [GtkChild] private ModificationsRevealer revealer;
-
-    [GtkChild] private SearchBar search_bar;
-    [GtkChild] private SearchEntry search_entry;
-    [GtkChild] private Button search_next_button;
-
-    construct
+    protected bool _small_keys_list_rows;
+    public bool small_keys_list_rows
     {
-        ulong revealer_reload_handler = revealer.reload.connect (invalidate_popovers);
-
-        EntryBuffer buffer = search_entry.get_buffer ();
-        ulong search_entry_buffer_deleted_text_handler = buffer.deleted_text.connect (() => search_next_button.set_sensitive (true));
-        search_bar.connect_entry (search_entry);
-        bind_property ("show-search-bar", search_bar, "search-mode-enabled", BindingFlags.BIDIRECTIONAL);   // TODO in UI file?
-        bind_property ("behaviour", revealer, "behaviour", BindingFlags.BIDIRECTIONAL|BindingFlags.SYNC_CREATE);
-
-        destroy.connect (() => {
-                revealer.disconnect (revealer_reload_handler);
-                buffer.disconnect (search_entry_buffer_deleted_text_handler);
-
-                base.destroy ();
-            });
-    }
-
-    public void init (string path, bool restore_view)   // TODO check path format
-    {
-        dir_tree_view.set_model (model);
-        dir_tree_view.expand_all ();
-
-        current_path = (restore_view && path != "" && path [0] == '/') ? path : "/";
-        path_requested (current_path, null);
-
-        application_settings.changed ["sort-case-sensitive"].connect (() => {
-                if (get_selected_directory ().need_sorting (application_settings.get_boolean ("sort-case-sensitive")))
-                    need_reload_warning_revealer.set_reveal_child (true);
-            });
-    }
-
-    /*\
-    * * Stack switching
-    \*/
-
-    private void show_browse_view (string path, string? selected, bool grab = true)
-    {
-        stack.set_transition_type (current_path.has_prefix (path) ? StackTransitionType.CROSSFADE : StackTransitionType.NONE);
-        need_reload_warning_revealer.set_reveal_child (false);
-        update_current_path (path);
-        stack.set_visible_child_name ("browse-view");
-        if (selected != null)
+        set
         {
-            check_resize ();
-            ListBoxRow? row = key_list_box.get_row_at_index (get_row_position ((!) selected));
-            if (row == null)
-                assert_not_reached ();
-            scroll_to_row ((!) row, grab);
+            _small_keys_list_rows = value;
+            key_list_box.foreach ((row) => {
+                    Widget? row_child = ((ListBoxRow) row).get_child ();
+                    if (row_child != null && (!) row_child is KeyListBoxRow)
+                        ((KeyListBoxRow) (!) row_child).small_keys_list_rows = value;
+                });
         }
-        else
-        {
-            ListBoxRow? row = key_list_box.get_row_at_index (0);
-            if (row != null)
-                scroll_to_row ((!) row, grab);
-        }
-        properties_view.clean ();
     }
-    private int get_row_position (string selected)
-        requires (key_model != null)
-    {
-        uint position = 0;
-        while (position < ((!) key_model).get_n_items ())
-        {
-            SettingObject object = (SettingObject) ((!) key_model).get_object (position);
-            if (object.full_name == selected)
-                return (int) position;
-            position++;
-        }
-        assert_not_reached ();
-    }
-    private void scroll_to_row (ListBoxRow row, bool grab)
+
+    protected void scroll_to_row (ListBoxRow row, bool grab_focus)
     {
         key_list_box.select_row (row);
-        if (grab)
+        if (grab_focus)
             row.grab_focus ();
 
         Allocation list_allocation, row_allocation;
-        stack.get_allocation (out list_allocation);
+        scrolled.get_allocation (out list_allocation);
         row.get_allocation (out row_allocation);
         key_list_box.get_adjustment ().set_value (row_allocation.y + (int) ((row_allocation.height - list_allocation.height) / 2.0));
     }
 
-
-    private void show_properties_view (string path)
+    public void invalidate_popovers ()
     {
-        stack.set_transition_type (path.has_prefix (current_path) && current_path.length == path.last_index_of_char ('/') + 1 ? StackTransitionType.CROSSFADE : StackTransitionType.NONE);
-        update_current_path (path);
-        stack.set_visible_child (properties_view);
+        uint position = 0;
+        ClickableListBoxRow? row = (ClickableListBoxRow?) rows_possibly_with_popover.get_item (0);
+        while (row != null)
+        {
+            ((!) row).destroy_popover ();
+            position++;
+            row = (ClickableListBoxRow?) rows_possibly_with_popover.get_item (position);
+        }
+        rows_possibly_with_popover.remove_all ();
     }
 
-    private void update_current_path (string path)
+    public string get_selected_row_name ()
     {
-        revealer.path_changed ();
-        current_path = path;
-        get_dconf_window ().update_path_elements ();
-        invalidate_popovers ();
+        ListBoxRow? selected_row = key_list_box.get_selected_row ();
+        if (selected_row != null)
+        {
+            int position = ((!) selected_row).get_index ();
+            return ((SettingObject) list_model.get_object (position)).full_name;
+        }
+        else
+            return "";
+    }
+
+    public abstract void select_first_row ();
+
+    public void select_row_named (string selected, string context, bool grab_focus)
+    {
+        check_resize ();
+        ListBoxRow? row = key_list_box.get_row_at_index (get_row_position (selected, context));
+        if (row != null)
+            scroll_to_row ((!) row, grab_focus);
+    }
+    private int get_row_position (string selected, string context)
+    {
+        uint position = 0;
+        uint fallback = 0;
+        while (position < list_model.get_n_items ())
+        {
+            SettingObject object = (SettingObject) list_model.get_object (position);
+            if (object.full_name == selected)
+            {
+                if (object is Directory
+                 || context == ".dconf" && object is DConfKey // theorical?
+                 || object is GSettingsKey && ((GSettingsKey) object).schema_id == context)
+                    return (int) position;
+                fallback = position;
+            }
+            position++;
+        }
+        return (int) fallback; // selected row may have been removed or context could be ""
+    }
+
+    public abstract bool up_or_down_pressed (bool is_down);
+
+    /*\
+    * * Keyboard calls
+    \*/
+
+    public bool show_row_popover ()
+    {
+        ListBoxRow? selected_row = (ListBoxRow?) key_list_box.get_selected_row ();
+        if (selected_row == null)
+            return false;
+
+        ClickableListBoxRow row = (ClickableListBoxRow) ((!) selected_row).get_child ();
+
+        if (row.right_click_popover_visible ())
+            row.hide_right_click_popover ();
+        else
+        {
+            row.show_right_click_popover ();
+            rows_possibly_with_popover.append (row);
+        }
+        return true;
+    }
+
+    public string? get_copy_text ()
+    {
+        ListBoxRow? selected_row = key_list_box.get_selected_row ();
+        if (selected_row == null)
+            return null;
+
+        return ((ClickableListBoxRow) ((!) selected_row).get_child ()).get_text ();
+    }
+
+    public void toggle_boolean_key ()
+    {
+        ListBoxRow? selected_row = (ListBoxRow?) key_list_box.get_selected_row ();
+        if (selected_row == null)
+            return;
+
+        if (!(((!) selected_row).get_child () is KeyListBoxRow))
+            return;
+
+        ((KeyListBoxRow) ((!) selected_row).get_child ()).toggle_boolean_key ();
+    }
+
+    public void set_selected_to_default ()
+    {
+        ListBoxRow? selected_row = (ListBoxRow?) key_list_box.get_selected_row ();
+        if (selected_row == null)
+            return;
+
+        if (!(((!) selected_row).get_child () is KeyListBoxRow))
+            assert_not_reached ();
+
+        ((KeyListBoxRow) ((!) selected_row).get_child ()).on_delete_call ();
+    }
+
+    public void discard_row_popover ()
+    {
+        ListBoxRow? selected_row = (ListBoxRow?) key_list_box.get_selected_row ();
+        if (selected_row == null)
+            return;
+
+        ((ClickableListBoxRow) ((!) selected_row).get_child ()).destroy_popover ();
+    }
+}
+
+class RegistryView : RegistryList
+{
+    public ModificationsHandler modifications_handler { private get; set; }
+
+    construct
+    {
+        placeholder.label = _("No keys in this path");
+        key_list_box.set_header_func (update_row_header);
     }
 
     /*\
-    * * Dir TreeView
+    * * Updating
     \*/
 
-    [GtkCallback]
-    private void dir_selected_cb ()
+    public void set_key_model (GLib.ListStore key_model)
     {
-        search_next_button.set_sensitive (true);        // TODO better, or maybe just hide search_bar 1/2
-        Directory dir = get_selected_directory ();
-        dir.sort_key_model (application_settings.get_boolean ("sort-case-sensitive"));
-        key_model = dir.key_model;
-
-        key_list_box.bind_model (key_model, new_list_box_row);
+        list_model = key_model;
+        key_list_box.bind_model (list_model, new_list_box_row);
     }
 
-    private Directory get_selected_directory ()
+    public bool check_reload (GLib.ListStore fresh_key_model)
     {
-        TreeIter iter;
-        if (dir_tree_selection.get_selected (null, out iter))
-            return model.get_directory (iter);
-        else
-            return model.get_root_directory ();
-    }
-
-    public void path_requested (string _full_name, string? selected)
-    {
-        string full_name = _full_name.dup ();
-        string folder_name;
-        if (full_name.has_suffix ("/"))
-            folder_name = full_name;
-        else
-            folder_name = DConfWindow.stripped_path (full_name);
-
-        if (!select_folder (folder_name))
-        {
-            get_dconf_window ().show_notification (_("Cannot find folder “%s”.").printf (folder_name));
-            current_path = "/";
-            show_browse_view ("/", null);
-            return;
-        }
-
-        if (full_name == folder_name)
-        {
-            show_browse_view (full_name, selected);
-            return;
-        }
-
-        string [] names = full_name.split ("/");
-        string key_name = names [names.length - 1];
-        Key? key = get_key_from_name (key_name);
-        if (key == null)
-        {
-            show_browse_view (folder_name, null);
-            get_dconf_window ().show_notification (_("Cannot find key “%s” here.").printf (key_name));
-            return;
-        }
-        if (((!) key) is DConfKey && ((DConfKey) ((!) key)).is_ghost)
-        {
-            show_browse_view (folder_name, folder_name + key_name);
-            get_dconf_window ().show_notification (_("Key “%s” has been removed.").printf (key_name));
-            return;
-        }
-
-        properties_view.populate_properties_list_box ((!) key);
-        show_properties_view (full_name);
-    }
-    private bool select_folder (string full_name)
-    {
-        if (full_name == "/")
-        {
-            dir_tree_selection.unselect_all ();
+        if (list_model.get_n_items () != fresh_key_model.get_n_items ())
             return true;
-        }
-
-        TreeIter iter;
-        Directory dir;
-
-        if (dir_tree_selection.get_selected (null, out iter))
+        for (uint i = 0; i < list_model.get_n_items (); i++)
         {
-            dir = model.get_directory (iter);
-            if (dir.full_name == full_name)
+            SettingObject setting_object = (SettingObject) list_model.get_item (i);
+            bool found = false;
+            for (uint j = 0; j < fresh_key_model.get_n_items (); j++)
+            {
+                SettingObject fresh_setting_object = (SettingObject) fresh_key_model.get_item (j);
+                if (setting_object.get_type () != fresh_setting_object.get_type ())
+                    continue;
+                if (setting_object.name != fresh_setting_object.name)
+                    continue;
+                // TODO compare other visible info (i.e. key summary and value)
+                found = true;
+                fresh_key_model.remove (j);
+                break;
+            }
+            if (!found)
                 return true;
         }
-
-        if (model.get_iter_first (out iter))
-        {
-            do
-            {
-                dir = model.get_directory (iter);
-
-                if (dir.full_name == full_name)
-                {
-                    dir_tree_selection.select_iter (iter);
-                    return true;
-                }
-            }
-            while (get_next_iter (ref iter));
-        }
-        else
-            assert_not_reached ();
+        if (fresh_key_model.get_n_items () > 0)
+            return true;
         return false;
     }
-    private Key? get_key_from_name (string key_name)
-        requires (key_model != null)
-    {
-        uint position = 0;
-        while (position < ((!) key_model).get_n_items ())
-        {
-            SettingObject object = (SettingObject) ((!) key_model).get_object (position);
-            if (object is Key && object.name == key_name)
-                return (Key) object;
-            position++;
-        }
-        return null;
-    }
 
-    private DConfWindow get_dconf_window ()
+    public override void select_first_row ()
     {
-        return (DConfWindow) DConfWindow._get_parent (DConfWindow._get_parent (this));
+        ListBoxRow? row = key_list_box.get_row_at_index (0);
+        if (row != null)
+            scroll_to_row ((!) row, true);
     }
 
     /*\
     * * Key ListBox
     \*/
 
+    private void update_row_header (ListBoxRow row, ListBoxRow? before)
+    {
+        string? label_text = null;
+        if (row.get_child () is KeyListBoxRowEditable)
+        {
+            string schema_id = ((KeyListBoxRowEditable) row.get_child ()).key.schema_id;
+            if (before == null
+             || !(((!) before).get_child () is KeyListBoxRowEditable
+               && ((KeyListBoxRowEditable) ((!) before).get_child ()).key.schema_id == schema_id))
+                label_text = schema_id;
+        }
+        else if (row.get_child () is KeyListBoxRowEditableNoSchema)
+        {
+            if (before == null || !(((!) before).get_child () is KeyListBoxRowEditableNoSchema))
+                label_text = _("Keys not defined by a schema");
+        }
+
+        ListBoxRowHeader header = new ListBoxRowHeader (before == null, label_text);
+        row.set_header (header);
+    }
+
     private Widget new_list_box_row (Object item)
     {
         ClickableListBoxRow row;
         SettingObject setting_object = (SettingObject) item;
-        ulong on_delete_call_handler;
 
         if (setting_object is Directory)
         {
-            row = new FolderListBoxRow (setting_object.name, setting_object.full_name);
-            on_delete_call_handler = row.on_delete_call.connect (() => reset_objects (((Directory) setting_object).key_model, true));
+            row = new FolderListBoxRow (setting_object.name, setting_object.full_name, setting_object.parent_path);
         }
         else
         {
             if (setting_object is GSettingsKey)
-                row = new KeyListBoxRowEditable ((GSettingsKey) setting_object);
+                row = new KeyListBoxRowEditable ((GSettingsKey) setting_object, modifications_handler);
             else
-                row = new KeyListBoxRowEditableNoSchema ((DConfKey) setting_object);
+                row = new KeyListBoxRowEditableNoSchema ((DConfKey) setting_object, modifications_handler);
 
-            Key key = (Key) setting_object;
             KeyListBoxRow key_row = (KeyListBoxRow) row;
-            on_delete_call_handler = row.on_delete_call.connect (() => set_key_value (key, null));
-            ulong set_key_value_handler = key_row.set_key_value.connect ((variant) => { set_key_value (key, variant); set_delayed_icon (row, key); });
-            ulong change_dismissed_handler = key_row.change_dismissed.connect (() => revealer.dismiss_change (key));
+            key_row.small_keys_list_rows = _small_keys_list_rows;
 
-            ulong key_planned_change_handler = key.notify ["planned-change"].connect (() => set_delayed_icon (row, key));
-            ulong key_planned_value_handler = key.notify ["planned-value"].connect (() => set_delayed_icon (row, key));
-            set_delayed_icon (row, key);
-
-            row.destroy.connect (() => {
-                    key_row.disconnect (set_key_value_handler);
-                    key_row.disconnect (change_dismissed_handler);
-                    key.disconnect (key_planned_change_handler);
-                    key.disconnect (key_planned_value_handler);
-                });
+            ulong delayed_modifications_changed_handler = modifications_handler.delayed_changes_changed.connect (() => key_row.set_delayed_icon ());
+            key_row.set_delayed_icon ();
+            row.destroy.connect (() => modifications_handler.disconnect (delayed_modifications_changed_handler));
         }
 
-        ulong on_row_clicked_handler = row.on_row_clicked.connect (() => request_path (setting_object.full_name));
         ulong button_press_event_handler = row.button_press_event.connect (on_button_pressed);
+        row.destroy.connect (() => row.disconnect (button_press_event_handler));
 
-        row.destroy.connect (() => {
-                row.disconnect (on_delete_call_handler);
-                row.disconnect (on_row_clicked_handler);
-                row.disconnect (button_press_event_handler);
-            });
+        /* Wrapper ensures max width for rows */
+        ListBoxRowWrapper wrapper = new ListBoxRowWrapper ();
 
-        return row;
-    }
-
-    private void set_delayed_icon (ClickableListBoxRow row, Key key)
-    {
-        if (key.planned_change)
+        wrapper.set_halign (Align.CENTER);
+        wrapper.add (row);
+        if (row is FolderListBoxRow)
         {
-            StyleContext context = row.get_style_context ();
-            context.add_class ("delayed");
-            if (key is DConfKey)
-            {
-                if (key.planned_value == null)
-                    context.add_class ("erase");
-                else
-                    context.remove_class ("erase");
-            }
+            wrapper.get_style_context ().add_class ("folder-row");
+            wrapper.action_name = "ui.open-folder";
+            wrapper.set_action_target ("s", setting_object.full_name);
         }
         else
-            row.get_style_context ().remove_class ("delayed");
+        {
+            wrapper.get_style_context ().add_class ("key-row");
+            wrapper.action_name = "ui.open-object";
+            string context = (setting_object is GSettingsKey) ? ((GSettingsKey) setting_object).schema_id : ".dconf";
+            wrapper.set_action_target ("(ss)", setting_object.full_name, context);
+        }
+
+        return wrapper;
     }
 
     private bool on_button_pressed (Widget widget, Gdk.EventButton event)
@@ -353,321 +322,41 @@ class RegistryView : Grid, PathElement
                 event_x += widget_x;
             }
 
-            row.show_right_click_popover (get_current_delay_mode (), event_x);
+            row.show_right_click_popover (event_x);
             rows_possibly_with_popover.append (row);
         }
 
         return false;
     }
 
-    [GtkCallback]
-    private void row_activated_cb (ListBoxRow list_box_row)
-    {
-        search_next_button.set_sensitive (true);        // TODO better, or maybe just hide search_bar 2/2
-
-        ((ClickableListBoxRow) list_box_row.get_child ()).on_row_clicked ();
-    }
-
-    public void invalidate_popovers ()
-    {
-        uint position = 0;
-        ClickableListBoxRow? row = (ClickableListBoxRow?) rows_possibly_with_popover.get_item (0);
-        while (row != null)
-        {
-            ((!) row).destroy_popover ();
-            position++;
-            row = (ClickableListBoxRow?) rows_possibly_with_popover.get_item (position);
-        }
-        rows_possibly_with_popover.remove_all ();
-        get_dconf_window ().update_hamburger_menu ();
-    }
-
-    [GtkCallback]
-    private void reload ()
-        requires (!is_not_browsing_view ())
+    public override bool up_or_down_pressed (bool is_down)
     {
         ListBoxRow? selected_row = key_list_box.get_selected_row ();
-        string? saved_selection = null;
+        uint n_items = list_model.get_n_items ();
+
         if (selected_row != null)
         {
-            int position = ((!) selected_row).get_index ();
-            saved_selection = ((SettingObject) ((!) key_model).get_object (position)).full_name;
-        }
-
-        get_selected_directory ().sort_key_model (application_settings.get_boolean ("sort-case-sensitive"));
-        show_browse_view (current_path, saved_selection);
-    }
-
-    /*\
-    * * Revealer stuff
-    \*/
-
-    public bool get_current_delay_mode ()
-    {
-        return revealer.get_current_delay_mode ();
-    }
-
-    public void enter_delay_mode ()
-    {
-        revealer.enter_delay_mode ();
-        invalidate_popovers ();
-    }
-
-    private void set_key_value (Key key, Variant? new_value)
-    {
-        if (get_current_delay_mode ())
-            revealer.add_delayed_setting (key, new_value);
-        else if (new_value != null)
-            key.value = (!) new_value;
-        else if (key is GSettingsKey)
-            ((GSettingsKey) key).set_to_default ();
-        else if (behaviour != Behaviour.UNSAFE)
-        {
-            enter_delay_mode ();
-            revealer.add_delayed_setting (key, null);
-        }
-        else
-            ((DConfKey) key).erase ();
-    }
-
-    /*\
-    * * Action entries
-    \*/
-
-    public void reset (bool recursively)
-    {
-        reset_objects (key_model, recursively);
-    }
-
-    private void reset_objects (GLib.ListStore? objects, bool recursively)
-    {
-        enter_delay_mode ();
-        reset_generic (objects, recursively);
-        revealer.warn_if_no_planned_changes ();
-    }
-
-    private void reset_generic (GLib.ListStore? objects, bool recursively)
-    {
-        if (objects == null)
-            return;
-
-        for (uint position = 0;; position++)
-        {
-            Object? object = ((!) objects).get_object (position);
-            if (object == null)
-                return;
-
-            SettingObject setting_object = (SettingObject) ((!) object);
-            if (setting_object is Directory)
-            {
-                if (recursively)
-                    reset_generic (((Directory) setting_object).key_model, true);
-                continue;
-            }
-            if (setting_object is DConfKey)
-            {
-                if (!((DConfKey) setting_object).is_ghost)
-                    revealer.add_delayed_setting ((Key) setting_object, null);
-            }
-            else if (!((GSettingsKey) setting_object).is_default)
-                revealer.add_delayed_setting ((Key) setting_object, null);
-        }
-    }
-
-    /*\
-    * * Keyboard calls
-    \*/
-
-    public void set_search_mode (bool? mode)    // mode is never 'true'...
-    {
-        if (mode == null)
-            search_bar.set_search_mode (!search_bar.get_search_mode ());
-        else
-            search_bar.set_search_mode ((!) mode);
-    }
-
-    public bool handle_search_event (Gdk.EventKey event)
-    {
-        if (is_not_browsing_view ())
-            return false;
-
-        return search_bar.handle_event (event);
-    }
-
-    public bool show_row_popover ()
-    {
-        ListBoxRow? selected_row = get_key_row ();
-        if (selected_row == null)
-            return false;
-
-        ClickableListBoxRow row = (ClickableListBoxRow) ((!) selected_row).get_child ();
-        row.show_right_click_popover (get_current_delay_mode ());
-        rows_possibly_with_popover.append (row);
-        return true;
-    }
-
-    public string? get_copy_text ()
-    {
-        if (is_not_browsing_view ())
-            return properties_view.get_copy_text ();
-
-        ListBoxRow? selected_row = key_list_box.get_selected_row ();
-        if (selected_row == null)
-            return null;
-        else
-            return ((ClickableListBoxRow) ((!) selected_row).get_child ()).get_text ();
-    }
-
-    public void toggle_boolean_key ()
-    {
-        ListBoxRow? selected_row = get_key_row ();
-        if (selected_row == null)
-            return;
-
-        if (!(((!) selected_row).get_child () is KeyListBoxRow))
-            return;
-
-        ((KeyListBoxRow) ((!) selected_row).get_child ()).toggle_boolean_key ();
-    }
-
-    public void set_to_default ()
-    {
-        ListBoxRow? selected_row = get_key_row ();
-        if (selected_row == null)
-            return;
-
-        ((ClickableListBoxRow) ((!) selected_row).get_child ()).on_delete_call ();
-    }
-
-    public void discard_row_popover ()
-    {
-        ListBoxRow? selected_row = get_key_row ();
-        if (selected_row == null)
-            return;
-
-        ((ClickableListBoxRow) ((!) selected_row).get_child ()).hide_right_click_popover ();
-    }
-
-    private bool is_not_browsing_view ()
-    {
-        string? visible_child_name = stack.get_visible_child_name ();
-        return (visible_child_name == null || ((!) visible_child_name) != "browse-view");
-    }
-
-    private ListBoxRow? get_key_row ()
-    {
-        if (is_not_browsing_view ())
-            return null;
-        return (ListBoxRow?) key_list_box.get_selected_row ();
-    }
-
-    /*\
-    * * Search box
-    \*/
-
-    [GtkCallback]
-    private void find_next_cb ()
-    {
-        if (!search_bar.get_search_mode ())     // TODO better; switches to next list_box_row when keyboard-activating an entry of the popover
-            return;
-
-        TreeIter iter;
-        bool on_first_directory;
-        int position = 0;
-        if (dir_tree_selection.get_selected (null, out iter))
-        {
-            ListBoxRow? selected_row = (ListBoxRow) key_list_box.get_selected_row ();
-            if (selected_row != null)
-                position = ((!) selected_row).get_index () + 1;
-
-            on_first_directory = true;
-        }
-        else if (model.get_iter_first (out iter))
-            on_first_directory = false;
-        else
-            return;     // TODO better
-
-        do
-        {
-            Directory dir = model.get_directory (iter);
-
-            if (!on_first_directory)
-            {
-                if (dir.name.index_of (search_entry.text) >= 0)
-                {
-                    dir_tree_selection.select_iter (iter);
-                    show_browse_view (dir.full_name, null, false);
-                    return;
-                }
-            }
-            else
-                on_first_directory = false;
-
-            /* Select next key that matches */
-            dir.sort_key_model (application_settings.get_boolean ("sort-case-sensitive"));
-            GLib.ListStore key_model = dir.key_model;
-            while (position < key_model.get_n_items ())
-            {
-                SettingObject object = (SettingObject) key_model.get_object (position);
-                if (object.name.index_of (search_entry.text) >= 0)
-                {
-                    dir_tree_selection.select_iter (iter);
-                    key_list_box.select_row (key_list_box.get_row_at_index (position));
-                    show_browse_view (dir.full_name, object.full_name, false);
-                    return;
-                }
-                else if (object is Key)
-                {
-                    Key key = (Key) object;
-                    if ((key is GSettingsKey || !((DConfKey) key).is_ghost) && key_matches (key, search_entry.text))
-                    {   // TODO use request_path (object.full_name); problem with hiding or not the pathbar
-                        properties_view.populate_properties_list_box (key);
-                        dir_tree_selection.select_iter (iter);
-                        key_list_box.select_row (key_list_box.get_row_at_index (position));
-                        show_properties_view (object.full_name);
-                        return;
-                    }
-                }
-                position++;
-            }
-
-            position = 0;
-        }
-        while (get_next_iter (ref iter));
-
-        search_next_button.set_sensitive (false);
-    }
-
-    private bool key_matches (Key key, string text)
-    {
-        /* Check in key's metadata */
-        if (key is GSettingsKey && ((GSettingsKey) key).search_for (text))
-            return true;
-
-        /* Check key value */
-        if (key.value.is_of_type (VariantType.STRING) && key.value.get_string ().index_of (text) >= 0)
-            return true;
-
-        return false;
-    }
-
-    private bool get_next_iter (ref TreeIter iter)
-    {
-        /* Search children next */
-        if (model.iter_has_child (iter))
-        {
-            model.iter_nth_child (out iter, iter, 0);
-            return true;
-        }
-
-        /* Move to the next branch */
-        while (!model.iter_next (ref iter))
-        {
-            /* Otherwise move to the parent and onto the next iter */
-            if (!model.iter_parent (out iter, iter))
+            Widget? row_content = ((!) selected_row).get_child ();
+            if (row_content != null && ((ClickableListBoxRow) (!) row_content).right_click_popover_visible ())
                 return false;
-        }
 
-        return true;
+            int position = ((!) selected_row).get_index ();
+            ListBoxRow? row = null;
+            if (!is_down && (position >= 1))
+                row = key_list_box.get_row_at_index (position - 1);
+            if (is_down && (position < n_items - 1))
+                row = key_list_box.get_row_at_index (position + 1);
+
+            if (row != null)
+                scroll_to_row ((!) row, true);
+
+            return true;
+        }
+        else if (n_items >= 1)
+        {
+            key_list_box.select_row (key_list_box.get_row_at_index (is_down ? 0 : (int) n_items - 1));
+            return true;
+        }
+        return false;
     }
 }

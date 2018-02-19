@@ -18,8 +18,10 @@
 using Gtk;
 
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/registry-info.ui")]
-class RegistryInfo : Grid
+class RegistryInfo : Grid, BrowsableView
 {
+    [GtkChild] private Revealer conflicting_key_warning_revealer;
+    [GtkChild] private Revealer hard_conflicting_key_error_revealer;
     [GtkChild] private Revealer no_schema_warning;
     [GtkChild] private Revealer one_choice_warning_revealer;
     [GtkChild] private Label one_choice_enum_warning;
@@ -27,7 +29,10 @@ class RegistryInfo : Grid
     [GtkChild] private ListBox properties_list_box;
     [GtkChild] private Button erase_button;
 
-    public ModificationsRevealer revealer { get; set; }
+    public ModificationsHandler modifications_handler { private get; set; }
+
+    private Variant? current_key_info = null;
+    public string full_name { get; private set; default = ""; }
 
     /*\
     * * Cleaning
@@ -40,16 +45,16 @@ class RegistryInfo : Grid
     public void clean ()
     {
         disconnect_handler (erase_button, ref erase_button_handler);
-        disconnect_handler (revealer, ref revealer_reload_1_handler);
-        disconnect_handler (revealer, ref revealer_reload_2_handler);
+        disconnect_handler (modifications_handler, ref revealer_reload_1_handler);
+        disconnect_handler (modifications_handler, ref revealer_reload_2_handler);
         properties_list_box.@foreach ((widget) => widget.destroy ());
     }
 
-    private void disconnect_handler (Widget widget, ref ulong handler)
+    private static void disconnect_handler (Object object, ref ulong handler)
     {
         if (handler == 0)   // erase_button_handler & revealer_reload_1_handler depend of the key's type
             return;
-        widget.disconnect (handler);
+        object.disconnect (handler);
         handler = 0;
     }
 
@@ -59,14 +64,35 @@ class RegistryInfo : Grid
 
     public void populate_properties_list_box (Key key)
     {
-        if (key is DConfKey && ((DConfKey) key).is_ghost)   // TODO place in "requires"
+        SettingsModel model = modifications_handler.model;
+        if (key is DConfKey && model.is_key_ghost ((DConfKey) key))   // TODO place in "requires"
             assert_not_reached ();
         clean ();   // for when switching between two keys, for example with a search (maybe also bookmarks)
 
         bool has_schema;
         unowned Variant [] dict_container;
+        current_key_info = key.properties;
+        full_name = key.full_name;
         key.properties.get ("(ba{ss})", out has_schema, out dict_container);
 
+        if (key is GSettingsKey)
+        {
+            if (((GSettingsKey) key).error_hard_conflicting_key)
+            {
+                conflicting_key_warning_revealer.set_reveal_child (false);
+                hard_conflicting_key_error_revealer.set_reveal_child (true);
+            }
+            else if (((GSettingsKey) key).warning_conflicting_key)
+            {
+                conflicting_key_warning_revealer.set_reveal_child (true);
+                hard_conflicting_key_error_revealer.set_reveal_child (false);
+            }
+            else
+            {
+                conflicting_key_warning_revealer.set_reveal_child (false);
+                hard_conflicting_key_error_revealer.set_reveal_child (false);
+            }
+        }
         no_schema_warning.set_reveal_child (!has_schema);
 
         properties_list_box.@foreach ((widget) => widget.destroy ());
@@ -75,13 +101,25 @@ class RegistryInfo : Grid
 
         // TODO use VariantDict
         string key_name, parent_path, tmp_string;
+        bool test;
 
         if (!dict.lookup ("key-name",     "s", out key_name))    assert_not_reached ();
         if (!dict.lookup ("parent-path",  "s", out parent_path)) assert_not_reached ();
 
+        if (dict.lookup ("defined-by",    "s", out tmp_string))  add_row_from_label (_("Defined by"),  tmp_string);
+        else assert_not_reached ();
         if (dict.lookup ("schema-id",     "s", out tmp_string))  add_row_from_label (_("Schema"),      tmp_string);
-        if (dict.lookup ("summary",       "s", out tmp_string))  add_row_from_label (_("Summary"),     tmp_string);
-        if (dict.lookup ("description",   "s", out tmp_string))  add_row_from_label (_("Description"), tmp_string);
+        add_separator ();
+        if (dict.lookup ("summary",       "s", out tmp_string))
+        {
+            test = tmp_string == "";
+            add_row_from_label (_("Summary"),                    test ? _("No summary provided")     : tmp_string, test);
+        }
+        if (dict.lookup ("description",   "s", out tmp_string))
+        {
+            test = tmp_string == "";
+            add_row_from_label (_("Description"),                test ? _("No description provided") : tmp_string, test);
+        }
         /* Translators: as in datatype (integer, boolean, string, etc.) */
         if (dict.lookup ("type-name",     "s", out tmp_string))  add_row_from_label (_("Type"),        tmp_string);
         else assert_not_reached ();
@@ -91,27 +129,35 @@ class RegistryInfo : Grid
 
         if (!dict.lookup ("type-code",    "s", out tmp_string))  assert_not_reached ();
 
-        Label label = new Label (get_current_value_text (has_schema && ((GSettingsKey) key).is_default, key));
-        ulong key_value_changed_handler = key.value_changed.connect (() => {
-                if (!has_schema && ((DConfKey) key).is_ghost)
-                    ((RegistryView) DConfWindow._get_parent (DConfWindow._get_parent (this))).request_path (parent_path);
-                else
-                    label.set_text (get_current_value_text (has_schema && ((GSettingsKey) key).is_default, key));
-            });
+        ulong key_value_changed_handler = 0;
+        Label label;
+        if (key is GSettingsKey && ((GSettingsKey) key).error_hard_conflicting_key)
+        {
+            label = new Label (_("There are conflicting definitions of this key, getting value would be either problematic or meaningless."));
+            label.get_style_context ().add_class ("italic-label");
+        }
+        else
+        {
+            label = new Label (get_current_value_text (has_schema && model.is_key_default ((GSettingsKey) key), key, modifications_handler.model));
+            key_value_changed_handler = key.value_changed.connect (() => {
+                    if (!has_schema && model.is_key_ghost ((DConfKey) key))
+                        label.set_text (_("Key erased."));
+                    else
+                        label.set_text (get_current_value_text (has_schema && model.is_key_default ((GSettingsKey) key), key, modifications_handler.model));
+                });
+        }
         label.halign = Align.START;
         label.valign = Align.START;
         label.xalign = 0;
         label.yalign = 0;
         label.wrap = true;
-        label.max_width_chars = 42;
-        label.width_chars = 42;
         label.hexpand = true;
         label.show ();
         add_row_from_widget (_("Current value"), label, null);
 
         add_separator ();
 
-        KeyEditorChild key_editor_child = create_child (key, has_schema);
+        KeyEditorChild key_editor_child = create_child (key, has_schema, modifications_handler);
         bool is_key_editor_child_single = key_editor_child is KeyEditorChildSingle;
         if (is_key_editor_child_single)
         {
@@ -121,16 +167,19 @@ class RegistryInfo : Grid
         }
         one_choice_warning_revealer.set_reveal_child (is_key_editor_child_single);
 
+        if (key is GSettingsKey && ((GSettingsKey) key).error_hard_conflicting_key)
+            return;
+
         ulong value_has_changed_handler = key_editor_child.value_has_changed.connect ((is_valid) => {
-                if (revealer.should_delay_apply (tmp_string))
+                if (modifications_handler.should_delay_apply (tmp_string))
                 {
                     if (is_valid)
-                        revealer.add_delayed_setting (key, key_editor_child.get_variant ());
+                        modifications_handler.add_delayed_setting (key.full_name, key_editor_child.get_variant ());
                     else
-                        revealer.dismiss_change (key);
+                        modifications_handler.dismiss_change (key.full_name);
                 }
                 else
-                    key.value = key_editor_child.get_variant ();
+                    model.set_key_value (key, key_editor_child.get_variant ());
             });
 
         if (has_schema)
@@ -145,16 +194,16 @@ class RegistryInfo : Grid
             custom_value_switch.bind_property ("active", key_editor_child, "sensitive", BindingFlags.SYNC_CREATE | BindingFlags.INVERT_BOOLEAN);
 
             GSettingsKey gkey = (GSettingsKey) key;
-            custom_value_switch.set_active (key.planned_change ? key.planned_value == null : gkey.is_default);
+            custom_value_switch.set_active (modifications_handler.key_value_is_default (gkey));
             ulong switch_active_handler = custom_value_switch.notify ["active"].connect (() => {
-                    if (revealer.should_delay_apply (tmp_string))
+                    if (modifications_handler.should_delay_apply (tmp_string))
                     {
                         if (custom_value_switch.get_active ())
-                            revealer.add_delayed_setting (key, null);
+                            modifications_handler.add_delayed_setting (key.full_name, null);
                         else
                         {
-                            Variant tmp_variant = key.planned_change && (key.planned_value != null) ? (!) key.planned_value : key.value;
-                            revealer.add_delayed_setting (key, tmp_variant);
+                            Variant tmp_variant = modifications_handler.get_key_custom_value (key);
+                            modifications_handler.add_delayed_setting (key.full_name, tmp_variant);
                             key_editor_child.reload (tmp_variant);
                         }
                     }
@@ -162,20 +211,20 @@ class RegistryInfo : Grid
                     {
                         if (custom_value_switch.get_active ())
                         {
-                            ((GSettingsKey) key).set_to_default ();
+                            model.set_key_to_default (((GSettingsKey) key).full_name, ((GSettingsKey) key).schema_id);
                             SignalHandler.block (key_editor_child, value_has_changed_handler);
-                            key_editor_child.reload (key.value);
-                            if (tmp_string == "<flags>")
-                                key.planned_value = key.value;
+                            key_editor_child.reload (model.get_key_value (key));
+                            //if (tmp_string == "<flags>")                      let's try to live without this...
+                            //    key.planned_value = key.value;
                             SignalHandler.unblock (key_editor_child, value_has_changed_handler);
                         }
                         else
-                            key.value = key.value;  // TODO that hurts...
+                            model.set_key_value (key, model.get_key_value (key));  // TODO that hurts...
                     }
                 });
-            revealer_reload_1_handler = revealer.reload.connect (() => {
+            revealer_reload_1_handler = modifications_handler.leave_delay_mode.connect (() => {
                     SignalHandler.block (custom_value_switch, switch_active_handler);
-                    custom_value_switch.set_active (gkey.is_default);
+                    custom_value_switch.set_active (model.is_key_default (gkey));
                     SignalHandler.unblock (custom_value_switch, switch_active_handler);
                 });
             custom_value_switch.destroy.connect (() => custom_value_switch.disconnect (switch_active_handler));
@@ -183,84 +232,117 @@ class RegistryInfo : Grid
         else
         {
             erase_button_handler = erase_button.clicked.connect (() => {
-                    revealer.enter_delay_mode ();
-                    revealer.add_delayed_setting (key, null);
+                    modifications_handler.enter_delay_mode ();
+                    modifications_handler.add_delayed_setting (key.full_name, null);
                 });
         }
 
-        ulong child_activated_handler = key_editor_child.child_activated.connect (() => revealer.apply_delayed_settings ());  // TODO "only" used for string-based and spin widgets
-        revealer_reload_2_handler = revealer.reload.connect (() => {
-                if (key is DConfKey && ((DConfKey) key).is_ghost)
+        ulong child_activated_handler = key_editor_child.child_activated.connect (() => modifications_handler.apply_delayed_settings ());  // TODO "only" used for string-based and spin widgets
+        revealer_reload_2_handler = modifications_handler.leave_delay_mode.connect (() => {
+                if (key is DConfKey && model.is_key_ghost ((DConfKey) key))
                     return;
                 SignalHandler.block (key_editor_child, value_has_changed_handler);
-                key_editor_child.reload (key.value);
-                if (tmp_string == "<flags>")
-                    key.planned_value = key.value;
+                key_editor_child.reload (model.get_key_value (key));
+                //if (tmp_string == "<flags>")                      let's try to live without this...
+                //    key.planned_value = key.value;
                 SignalHandler.unblock (key_editor_child, value_has_changed_handler);
             });
         add_row_from_widget (_("Custom value"), key_editor_child, tmp_string);
 
         key_editor_child.destroy.connect (() => {
+                if (key_value_changed_handler == 0)
+                    assert_not_reached ();
                 key.disconnect (key_value_changed_handler);
                 key_editor_child.disconnect (value_has_changed_handler);
                 key_editor_child.disconnect (child_activated_handler);
             });
     }
 
-    private static KeyEditorChild create_child (Key key, bool has_schema)
+    private static KeyEditorChild create_child (Key key, bool has_schema, ModificationsHandler modifications_handler)
     {
+        SettingsModel model = modifications_handler.model;
+        Variant initial_value = modifications_handler.get_key_custom_value (key);
         switch (key.type_string)
         {
             case "<enum>":
                 switch (((GSettingsKey) key).range_content.n_children ())
                 {
-                    case 0:  assert_not_reached ();
-                    case 1:  return (KeyEditorChild) new KeyEditorChildSingle (key.value, key.value.get_string ());
-                    default: return (KeyEditorChild) new KeyEditorChildEnum (key);
+                    case 0: assert_not_reached ();
+                    case 1:
+                        return (KeyEditorChild) new KeyEditorChildSingle (model.get_key_value (key), model.get_key_value (key).get_string ());
+                    default:
+                        bool delay_mode = modifications_handler.get_current_delay_mode ();
+                        bool has_planned_change = modifications_handler.key_has_planned_change (key.full_name);
+                        Variant range_content = ((GSettingsKey) key).range_content;
+                        return (KeyEditorChild) new KeyEditorChildEnum (initial_value, delay_mode, has_planned_change, range_content);
                 }
+
             case "<flags>":
-                return (KeyEditorChild) new KeyEditorChildFlags ((GSettingsKey) key);
+                string [] all_flags = ((GSettingsKey) key).range_content.get_strv ();
+                string [] active_flags = ((GSettingsKey) key).settings.get_strv (key.name);
+                KeyEditorChildFlags key_editor_child_flags = new KeyEditorChildFlags (initial_value, all_flags, active_flags);
+
+                ulong delayed_modifications_changed_handler = modifications_handler.delayed_changes_changed.connect (() => {
+                        active_flags = modifications_handler.get_key_custom_value (key).get_strv ();
+                        key_editor_child_flags.update_flags (active_flags);
+                    });
+                key_editor_child_flags.destroy.connect (() => modifications_handler.disconnect (delayed_modifications_changed_handler));
+                return (KeyEditorChild) key_editor_child_flags;
+
             case "b":
-                return (KeyEditorChild) new KeyEditorChildBool (key.planned_change && (key.planned_value != null) ? ((!) key.planned_value).get_boolean () : key.value.get_boolean ());
+                return (KeyEditorChild) new KeyEditorChildBool (initial_value.get_boolean ());
+
             case "n":
             case "i":
             case "h":
             // TODO "x" is not working in spinbuttons (double-based)
-                Variant range = ((GSettingsKey) key).range_content;
-                if (has_schema
-                    && (((GSettingsKey) key).range_type == "range")
-                    && (Key.get_variant_as_int64 (range.get_child_value (0)) == Key.get_variant_as_int64 (range.get_child_value (1)))
-                   )
-                    return (KeyEditorChild) new KeyEditorChildSingle (key.value, key.value.print (false));
-                else
-                    return (KeyEditorChild) new KeyEditorChildNumberInt (key);
+                Variant? range = null;
+                if (has_schema && (((GSettingsKey) key).range_type == "range"))
+                {
+                    range = ((GSettingsKey) key).range_content;
+                    if (Key.get_variant_as_int64 (((!) range).get_child_value (0)) == Key.get_variant_as_int64 (((!) range).get_child_value (1)))
+                        return (KeyEditorChild) new KeyEditorChildSingle (model.get_key_value (key), model.get_key_value (key).print (false));
+                }
+                return (KeyEditorChild) new KeyEditorChildNumberInt (initial_value, key.type_string, range);
+
             case "y":
             case "q":
             case "u":
             // TODO "t" is not working in spinbuttons (double-based)
-                Variant range = ((GSettingsKey) key).range_content;
-                if (has_schema
-                    && (((GSettingsKey) key).range_type == "range")
-                    && (Key.get_variant_as_uint64 (range.get_child_value (0)) == Key.get_variant_as_uint64 (range.get_child_value (1)))
-                   )
-                    return (KeyEditorChild) new KeyEditorChildSingle (key.value, key.value.print (false));
-                else
-                    return (KeyEditorChild) new KeyEditorChildNumberInt (key);
+                Variant? range = null;
+                if (has_schema && (((GSettingsKey) key).range_type == "range"))
+                {
+                    range = ((GSettingsKey) key).range_content;
+                    if (Key.get_variant_as_uint64 (((!) range).get_child_value (0)) == Key.get_variant_as_uint64 (((!) range).get_child_value (1)))
+                        return (KeyEditorChild) new KeyEditorChildSingle (model.get_key_value (key), model.get_key_value (key).print (false));
+                }
+                return (KeyEditorChild) new KeyEditorChildNumberInt (initial_value, key.type_string, range);
+
             case "d":
-                return (KeyEditorChild) new KeyEditorChildNumberDouble (key);
+                return (KeyEditorChild) new KeyEditorChildNumberDouble (initial_value);
+
             case "mb":
-                return (KeyEditorChild) new KeyEditorChildNullableBool (key);
+                bool delay_mode = modifications_handler.get_current_delay_mode ();
+                bool has_planned_change = modifications_handler.key_has_planned_change (key.full_name);
+                Variant? range_content_or_null = null;
+                if (key is GSettingsKey)
+                    range_content_or_null = ((GSettingsKey) key).range_content;
+                return (KeyEditorChild) new KeyEditorChildNullableBool (initial_value, delay_mode, has_planned_change, range_content_or_null);
+
             default:
-                return (KeyEditorChild) new KeyEditorChildDefault (key.type_string, key.planned_change && (key.planned_value != null) ? (!) key.planned_value : key.value);
+                if ("a" in key.type_string)
+                    return (KeyEditorChild) new KeyEditorChildArray (key.type_string, initial_value);
+                else
+                    return (KeyEditorChild) new KeyEditorChildDefault (key.type_string, initial_value);
         }
     }
 
-    private static string get_current_value_text (bool is_default, Key key)
+    private static string get_current_value_text (bool is_default, Key key, SettingsModel model)
     {
         if (is_default)
             return _("Default value");
         else
-            return Key.cool_text_value_from_variant (key.value, key.type_string);
+            return Key.cool_text_value_from_variant (model.get_key_value (key), key.type_string);
     }
 
     public string? get_copy_text ()
@@ -278,9 +360,9 @@ class RegistryInfo : Grid
     * * Rows creation
     \*/
 
-    private void add_row_from_label (string property_name, string property_value)
+    private void add_row_from_label (string property_name, string property_value, bool use_italic = false)
     {
-        properties_list_box.add (new PropertyRow.from_label (property_name, property_value));
+        properties_list_box.add (new PropertyRow.from_label (property_name, property_value, use_italic));
     }
 
     private void add_switch_row (string property_name, Switch custom_value_switch)
@@ -301,13 +383,13 @@ class RegistryInfo : Grid
     private void add_separator ()
     {
         Separator separator = new Separator (Orientation.HORIZONTAL);
-        separator.halign = Align.CENTER;
-        separator.width_request = 620;
+        separator.halign = Align.FILL;
         separator.margin_bottom = 5;
         separator.margin_top = 5;
         separator.show ();
 
-        ListBoxRow row = new ListBoxRow ();
+        ListBoxRowWrapper row = new ListBoxRowWrapper ();
+        row.halign = Align.CENTER;
         row.add (separator);
         row.set_sensitive (false);
 /* TODO could be selected by down arrow        row.focus.connect ((direction) => { row.move_focus (direction); return false; }); */
@@ -317,6 +399,9 @@ class RegistryInfo : Grid
 
     private static Widget? add_warning (string type)
     {
+        if (type == "d")    // TODO if type contains "d"; on Intl.get_language_names ()[0] != "C"?
+            return warning_label (_("Use a dot as decimal mark and no thousands separator. You can use the X.Ye+Z notation."));
+
         if (type != "<flags>" && ((type != "s" && "s" in type) || (type != "g" && "g" in type)) || (type != "o" && "o" in type))
         {
             if ("m" in type)
@@ -333,24 +418,31 @@ class RegistryInfo : Grid
     private static Widget warning_label (string text)
     {
         Label label = new Label (text);
-        label.max_width_chars = 59;
         label.wrap = true;
         StyleContext context = label.get_style_context ();
         context.add_class ("italic-label");
         context.add_class ("greyed-label");
+        context.add_class ("warning-label");
         return (Widget) label;
+    }
+
+    public bool check_reload (Variant properties)
+    {
+        if (current_key_info == null) // should not happen?
+            return true;
+        return !((!) current_key_info).equal (properties); // TODO compare key value with editor value?
     }
 }
 
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/property-row.ui")]
-private class PropertyRow : ListBoxRow
+private class PropertyRow : ListBoxRowWrapper
 {
     [GtkChild] private Grid grid;
     [GtkChild] private Label name_label;
 
     private Widget? value_widget = null;
 
-    public PropertyRow.from_label (string property_name, string property_value)
+    public PropertyRow.from_label (string property_name, string property_value, bool use_italic)
     {
         name_label.set_text (property_name);
 
@@ -360,8 +452,8 @@ private class PropertyRow : ListBoxRow
         value_label.xalign = 0;
         value_label.yalign = 0;
         value_label.wrap = true;
-        value_label.max_width_chars = 42;
-        value_label.width_chars = 42;
+        if (use_italic)
+            value_label.get_style_context ().add_class ("italic-label");
         value_label.show ();
         grid.attach (value_label, 1, 0, 1, 1);
     }

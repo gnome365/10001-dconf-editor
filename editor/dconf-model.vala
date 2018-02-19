@@ -15,126 +15,229 @@
   along with Dconf Editor.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-public abstract class SettingObject : Object
+public class SettingsModel : Object
 {
-    public Directory? nullable_parent { private get; construct; }
-    public Directory parent { get { return nullable_parent == null ? (Directory) this : (!) nullable_parent; }}   // TODO make protected or even remove
-    public string name { get; construct; }
+    private SourceManager source_manager = new SourceManager ();
+    public bool refresh_source { get; set; default = true; }
 
-    public string casefolded_name { get; construct; }
-    public string full_name { get; private set; }
-    construct
+    private DConf.Client client = new DConf.Client ();
+    private string? last_change_tag = null;
+    public bool copy_action = false;
+
+    public signal void paths_changed (GenericSet<string> modified_path_specs, bool internal_changes);
+
+    public void refresh_relocatable_schema_paths (bool user_schemas,
+                                                  bool built_in_schemas,
+                                                  bool internal_schemas,
+                                                  bool startup_schemas,
+                                                  Variant user_paths_variant)
     {
-        full_name = nullable_parent == null ? "/" : ((!) nullable_parent).full_name + name + ((this is Directory) ? "/" : "");
-        casefolded_name = name.casefold ();
-    }
-}
-
-public class Directory : SettingObject
-{
-    public int index { get { return parent.children.index (this); }}        // TODO remove
-
-    public HashTable<string, Directory> child_map = new HashTable<string, Directory> (str_hash, str_equal);
-    public List<Directory> children = new List<Directory> ();     // TODO remove
-
-    public Directory (Directory? parent, string name, DConf.Client client)
-    {
-        Object (nullable_parent: parent, name: name);
-
-        this.client = client;
+        source_manager.refresh_relocatable_schema_paths (user_schemas,
+                                                         built_in_schemas,
+                                                         internal_schemas,
+                                                         startup_schemas,
+                                                         user_paths_variant);
     }
 
-    /*\
-    * * Keys management
-    \*/
-
-    private SettingsSchema? settings_schema = null;
-    private string []? gsettings_key_map = null;
-
-    private GLib.Settings settings;
-
-    private DConf.Client client;
-
-    private bool? last_sort = null;
-    private bool? require_sorting = null;
-
-    private GLib.ListStore? _key_model = null;
-    public GLib.ListStore key_model
+    public void add_mapping (string schema, string path)
     {
-        get
-        {
-            if (_key_model == null)
-            {
-                _key_model = new GLib.ListStore (typeof (SettingObject));
-                create_folders ();
-                create_gsettings_keys ();
-                create_dconf_keys ();
-            }
-            return (!) _key_model;
-        }
+        source_manager.add_mapping (schema, path);
     }
 
-    /*\
-    * * Folders creation
-    \*/
-
-    private void create_folders ()
+    public void finalize_model ()
     {
-        require_sorting = false;
-        children.foreach ((dir) => {
-                SettingObject _dir = (SettingObject) dir;
-                ((!) _key_model).append (_dir);
-                if (_dir.name != _dir.casefolded_name)
-                    require_sorting = true;
+        source_manager.paths_changed.connect ((modified_path_specs) => paths_changed (modified_path_specs, false));
+        source_manager.refresh_schema_source ();
+        Timeout.add (3000, () => {
+                if (refresh_source) // TODO better: stops the I/O, but not the wakeup
+                    source_manager.refresh_schema_source ();
+                return true;
             });
+
+        client.changed.connect ((client, prefix, changes, tag) => {
+                bool internal_changes = copy_action;
+                if (copy_action)
+                    copy_action = false;
+                if (last_change_tag != null && tag != null && (!) last_change_tag == (!) tag)
+                {
+                    last_change_tag = null;
+                    internal_changes = true;
+                }
+
+                GenericSet<string> modified_path_specs = new GenericSet<string> (str_hash, str_equal);
+                modified_path_specs.add (prefix);
+                foreach (string change in changes)
+                {
+                    string item_path = prefix + change;
+                    if (is_key_path (item_path))
+                        modified_path_specs.add (get_parent_path (item_path));
+                    else
+                        modified_path_specs.add (item_path);
+                }
+                GenericSetIter<string> iter = modified_path_specs.iterator ();
+                string? path_spec;
+                while ((path_spec = iter.next_value ()) != null)
+                {
+                    if (source_manager.cached_schemas.get_schema_count ((!) path_spec) > 0)
+                        iter.remove ();
+                }
+                paths_changed (modified_path_specs, internal_changes);
+            });
+        client.watch_sync ("/");
     }
 
-    public bool need_sorting (bool case_sensitive)
-        requires (require_sorting != null)
-        requires (last_sort != null)
+    /*\
+    * * Objects requests
+    \*/
+
+    public Directory get_root_directory ()
     {
-        return ((!) require_sorting) && (case_sensitive != (!) last_sort);
+        return new Directory ("/", "/");
     }
 
-    public void sort_key_model (bool case_sensitive)
+    private Directory? get_directory (string path)
     {
-        if (require_sorting != null && !need_sorting (case_sensitive))
-            return;
+        if (path == "/")
+            return get_root_directory ();
 
-        _sort_key_model (key_model, case_sensitive);
-        last_sort = case_sensitive;
+        uint schemas_count = 0;
+        uint subpaths_count = 0;
+        source_manager.cached_schemas.get_content_count (path, out schemas_count, out subpaths_count);
+        if (schemas_count + subpaths_count > 0 || client.list (path).length > 0)
+            return new Directory (path, get_name (path));
+        return null;
     }
-    private static void _sort_key_model (GLib.ListStore model, bool case_sensitive)
+
+    public GLib.ListStore? get_children (string folder_path)
     {
-        if (case_sensitive)
-            model.sort ((a, b) => { return strcmp (((SettingObject) a).name, ((SettingObject) b).name); });
+        Directory? dir = get_directory (folder_path);
+        if (dir == null)
+            return null;
+
+        GLib.ListStore key_model = new GLib.ListStore (typeof (SettingObject));
+        bool multiple_schemas;
+
+        lookup_gsettings (folder_path, key_model, out multiple_schemas);
+        create_dconf_keys (folder_path, key_model);
+
+        if (key_model.get_n_items () > 0)
+            return key_model;
         else
-            model.sort ((a, b) => { return ((SettingObject) a).casefolded_name.collate (((SettingObject) b).casefolded_name); });
+            return null;
+    }
+
+    public SettingObject? get_object (string path)
+    {
+        if (is_key_path (path))
+            return (SettingObject?) get_key (path, "");
+        else
+            return (SettingObject?) get_directory (path);
+    }
+
+    public Key? get_key (string path, string context = "")
+    {
+        GLib.ListStore? key_model = get_children (get_parent_path (path));
+        return get_key_from_path_and_name (key_model, get_name (path), context);
+    }
+
+    public bool path_exists (string path)
+    {
+        if (is_key_path (path))
+        {
+            GLib.ListStore? key_model = get_children (get_parent_path (path));
+            return get_key_from_path_and_name (key_model, get_name (path)) != null;
+        }
+        else
+            return get_directory (path) != null;
+    }
+
+    private static Key? get_key_from_path_and_name (GLib.ListStore? key_model, string key_name, string context = "")
+    {
+        if (key_model == null)
+            return null;
+        uint position = 0;
+        while (position < ((!) key_model).get_n_items ())
+        {
+            SettingObject? object = (SettingObject?) ((!) key_model).get_object (position);
+            if (object == null)
+                assert_not_reached ();
+            if ((!) object is Key && ((!) object).name == key_name)
+            {
+                // assumes for now you cannot have both a dconf key and a gsettings key with the same name
+                if (context == "")
+                    return (Key) (!) object;
+                if ((!) object is GSettingsKey && context == ((GSettingsKey) (!) object).schema_id)
+                    return (Key) (!) object;
+                if ((!) object is DConfKey && context == ".dconf")  // return key even if not DConfKey?
+                    return (Key) (!) object;
+            }
+            position++;
+        }
+        return null;
+    }
+
+    private static Directory? get_folder_from_path_and_name (GLib.ListStore? key_model, string folder_name)
+    {
+        if (key_model == null)
+            return null;
+        uint position = 0;
+        while (position < ((!) key_model).get_n_items ())
+        {
+            SettingObject? object = (SettingObject?) ((!) key_model).get_object (position);
+            if (object == null)
+                assert_not_reached ();
+            if ((!) object is Directory && ((!) object).name == folder_name)
+                return (Directory) (!) object;
+            position++;
+        }
+        return null;
     }
 
     /*\
     * * GSettings keys creation
     \*/
 
-    public void init_gsettings_keys (SettingsSchema _settings_schema)
+    private void lookup_gsettings (string path, GLib.ListStore key_model, out bool multiple_schemas)
     {
-        settings_schema = _settings_schema;
-    }
-
-    private void create_gsettings_keys ()
-    {
-        if (settings_schema == null)
+        multiple_schemas = false;
+        if (source_manager.source_is_null ())
             return;
 
-        gsettings_key_map = ((!) settings_schema).list_keys ();
-        settings = new GLib.Settings (((!) settings_schema).get_id ());
+        GenericSet<SettingsSchema> schemas;
+        GenericSet<string> folders;
+        source_manager.cached_schemas.lookup (path, out schemas, out folders);
+        if (schemas.length > 0)
+            foreach (SettingsSchema schema in schemas.get_values ())
+                create_gsettings_keys (path, (!) schema, key_model);
 
-        foreach (string key_id in (!) gsettings_key_map)
-            create_gsettings_key (key_id, ((!) settings_schema).get_key (key_id));
+        foreach (string folder in folders.get_values ())
+        {
+            if (get_folder_from_path_and_name (key_model, folder) == null)
+            {
+                Directory child = new Directory (path + folder + "/", folder);
+                key_model.append (child);
+            }
+        }
     }
 
-    private void create_gsettings_key (string key_id, SettingsSchemaKey settings_schema_key)
+    private void create_gsettings_keys (string parent_path, GLib.SettingsSchema settings_schema, GLib.ListStore key_model)
     {
+        string [] gsettings_key_map = settings_schema.list_keys ();
+        string? path = settings_schema.get_path ();
+        GLib.Settings settings;
+        if (path == null) // relocatable
+            settings = new Settings.full (settings_schema, null, parent_path);
+        else
+            settings = new Settings.full (settings_schema, null, null);
+
+        foreach (string key_id in gsettings_key_map)
+            create_gsettings_key (parent_path, key_id, settings_schema, settings, key_model);
+    }
+
+    private void create_gsettings_key (string parent_path, string key_id, GLib.SettingsSchema settings_schema, GLib.Settings settings, GLib.ListStore key_model)
+    {
+        SettingsSchemaKey settings_schema_key = settings_schema.get_key (key_id);
+
         string range_type = settings_schema_key.get_range ().get_child_value (0).get_string (); // don’t put it in the switch, or it fails
         string type_string;
         switch (range_type)
@@ -151,10 +254,11 @@ public class Directory : SettingObject
         if (default_value == null)
             assert_not_reached ();  // TODO report bug, shouldn't be nullable
         GSettingsKey new_key = new GSettingsKey (
-                this,
+                parent_path,
                 key_id,
                 settings,
-                settings.schema_id,
+                settings_schema.get_id (),
+                settings_schema.get_path (),
                 ((!) (nullable_summary ?? "")).strip (),
                 ((!) (nullable_description ?? "")).strip (),
                 type_string,
@@ -162,608 +266,311 @@ public class Directory : SettingObject
                 range_type,
                 settings_schema_key.get_range ().get_child_value (1).get_child_value (0)
             );
-        ((!) _key_model).append (new_key);
+        GSettingsKey? conflicting_key = (GSettingsKey?) get_key_from_path_and_name (key_model, key_id); // safe cast, no DConfKey's added yet
+        if (conflicting_key != null)
+        {
+            ((!) conflicting_key).warning_conflicting_key = true;
+            new_key.warning_conflicting_key = true;
+            if (((!) conflicting_key).error_hard_conflicting_key == true
+             || new_key.type_string != ((!) conflicting_key).type_string
+             || !new_key.default_value.equal (((!) conflicting_key).default_value)
+             || new_key.range_type != ((!) conflicting_key).range_type
+             || !new_key.range_content.equal (((!) conflicting_key).range_content))
+            {
+                ((!) conflicting_key).error_hard_conflicting_key = true;
+                new_key.error_hard_conflicting_key = true;
+            }
+        }
+        key_model.append (new_key);
     }
 
     /*\
     * * DConf keys creation
     \*/
 
-    private signal void item_changed (string item);
-    private void dconf_client_change (DConf.Client client, string path, string [] items, string? tag)
+    private void create_dconf_keys (string parent_path, GLib.ListStore key_model)
     {
-        foreach (string item in items)
-            item_changed (path + item);
-    }
-
-    private void create_dconf_keys ()
-    {
-        foreach (string item in client.list (full_name))
-            if (DConf.is_key (full_name + item) && (settings_schema == null || !(item in gsettings_key_map)))
-                create_dconf_key (item);
-        client.changed.connect (dconf_client_change);       // TODO better
-    }
-
-    private void create_dconf_key (string key_id)
-    {
-        DConfKey new_key = new DConfKey (client, this, key_id);
-        item_changed.connect ((item) => {
-                if ((item.has_suffix ("/") && new_key.full_name.has_prefix (item)) || item == new_key.full_name)    // TODO better
-                {
-                    new_key.is_ghost = client.read (new_key.full_name) == null;
-                    new_key.value_changed ();
-                }
-            });
-        ((!) _key_model).append ((Key) new_key);
-    }
-}
-
-public abstract class Key : SettingObject
-{
-    public abstract string descriptor { owned get; }
-
-    public string type_string { get; protected set; default = "*"; }
-    public Variant properties { owned get; protected set; }
-
-    public bool planned_change { get; set; default = false; }
-    public Variant? planned_value { get; set; default = null; }
-
-    public abstract Variant value { owned get; set; }
-
-    public signal void value_changed ();
-
-    protected static string key_to_description (string type)
-    {
-        switch (type)
+        foreach (string item in client.list (parent_path))
         {
-            case "b":
-                return _("Boolean");
-            case "s":
-                return _("String");
-            case "as":
-                return _("String array");
-            case "<enum>":
-                return _("Enumeration");
-            case "<flags>":
-                return _("Flags");
-            case "d":
-                return _("Double");
-            case "h":
-                /* Translators: this handle type is an index; you may maintain the word "handle" */
-                return _("D-Bus handle type");
-            case "o":
-                return _("D-Bus object path");
-            case "ao":
-                return _("D-Bus object path array");
-            case "g":
-                return _("D-Bus signature");
-            case "y":       // TODO byte, bytestring, bytestring array
-            case "n":
-            case "q":
-            case "i":
-            case "u":
-            case "x":
-            case "t":
-                return _("Integer");
-            default:
-                return type;
+            string item_path = parent_path + item;
+            if (DConf.is_dir (item_path))
+            {
+                string item_name = item [0:-1];
+                if (get_folder_from_path_and_name (key_model, item_name) == null)
+                    key_model.append (new Directory (item_path, item_name));
+            }
+            else if (DConf.is_key (item_path) && get_key_from_path_and_name (key_model, item) == null)
+                create_dconf_key (parent_path, item, key_model);
         }
     }
 
-    protected static void get_min_and_max_string (out string min, out string max, string type_string)
+    private void create_dconf_key (string parent_path, string key_id, GLib.ListStore key_model)
     {
-        switch (type_string)
-        {
-            // TODO %I'xx everywhere! but would need support from the spinbutton…
-            case "y":
-                min = "%hhu".printf (uint8.MIN);    // TODO format as in
-                max = "%hhu".printf (uint8.MAX);    //   cool_text_value_from_variant()
-                return;
-            case "n":
-                string? nullable_min = "%'hi".printf (int16.MIN).locale_to_utf8 (-1, null, null, null);
-                string? nullable_max = "%'hi".printf (int16.MAX).locale_to_utf8 (-1, null, null, null);
-                min = (!) (nullable_min ?? "%hi".printf (int16.MIN));
-                max = (!) (nullable_max ?? "%hi".printf (int16.MAX));
-                return;
-            case "q":
-                string? nullable_min = "%'hu".printf (uint16.MIN).locale_to_utf8 (-1, null, null, null);
-                string? nullable_max = "%'hu".printf (uint16.MAX).locale_to_utf8 (-1, null, null, null);
-                min = (!) (nullable_min ?? "%hu".printf (uint16.MIN));
-                max = (!) (nullable_max ?? "%hu".printf (uint16.MAX));
-                return;
-            case "i":
-                string? nullable_min = "%'i".printf (int32.MIN).locale_to_utf8 (-1, null, null, null);
-                string? nullable_max = "%'i".printf (int32.MAX).locale_to_utf8 (-1, null, null, null);
-                min = (!) (nullable_min ?? "%i".printf (int32.MIN));
-                max = (!) (nullable_max ?? "%i".printf (int32.MAX));
-                return;     // TODO why is 'li' failing to display '-'?
-            case "u":
-                string? nullable_min = "%'u".printf (uint32.MIN).locale_to_utf8 (-1, null, null, null);
-                string? nullable_max = "%'u".printf (uint32.MAX).locale_to_utf8 (-1, null, null, null);
-                min = (!) (nullable_min ?? "%u".printf (uint32.MIN));
-                max = (!) (nullable_max ?? "%u".printf (uint32.MAX));
-                return;     // TODO is 'lu' failing also?
-            case "x":
-                string? nullable_min = "%'lli".printf (int64.MIN).locale_to_utf8 (-1, null, null, null);
-                string? nullable_max = "%'lli".printf (int64.MAX).locale_to_utf8 (-1, null, null, null);
-                min = (!) (nullable_min ?? "%lli".printf (int64.MIN));
-                max = (!) (nullable_max ?? "%lli".printf (int64.MAX));
-                return;
-            case "t":
-                string? nullable_min = "%'llu".printf (uint64.MIN).locale_to_utf8 (-1, null, null, null);
-                string? nullable_max = "%'llu".printf (uint64.MAX).locale_to_utf8 (-1, null, null, null);
-                min = (!) (nullable_min ?? "%llu".printf (uint64.MIN));
-                max = (!) (nullable_max ?? "%llu".printf (uint64.MAX));
-                return;
-            case "d":
-                min = double.MIN.to_string ();
-                max = double.MAX.to_string ();
-                return;     // TODO something
-            case "h":
-                string? nullable_min = "%'i".printf (int32.MIN).locale_to_utf8 (-1, null, null, null);
-                string? nullable_max = "%'i".printf (int32.MAX).locale_to_utf8 (-1, null, null, null);
-                min = (!) (nullable_min ?? "%i".printf (int32.MIN));
-                max = (!) (nullable_max ?? "%i".printf (int32.MAX));
-                return;
-            default: assert_not_reached ();
-        }
+        Variant? key_value = get_dconf_key_value_or_null (parent_path + key_id, client);
+        if (key_value == null)
+            return;
+        DConfKey new_key = new DConfKey (client, parent_path, key_id, ((!) key_value).get_type_string ());
+        key_model.append (new_key);
     }
 
-    public static string cool_text_value_from_variant (Variant variant, string type)        // called from subclasses and from KeyListBoxRow
+    /*\
+    * * Path utilities
+    \*/
+
+    public static bool is_key_path (string path)
     {
-        switch (type)
-        {
-            case "b":
-                return cool_boolean_text_value (variant.get_boolean (), false);
-            // TODO %I'xx everywhere! but would need support from the spinbutton…
-            case "y":
-                return "%hhu (%s)".printf (variant.get_byte (), variant.print (false));     // TODO i18n problem here
-            case "n":
-                string? nullable_text = "%'hi".printf (variant.get_int16 ()).locale_to_utf8 (-1, null, null, null);
-                return (!) (nullable_text ?? "%hi".printf (variant.get_int16 ()));
-            case "q":
-                string? nullable_text = "%'hu".printf (variant.get_uint16 ()).locale_to_utf8 (-1, null, null, null);
-                return (!) (nullable_text ?? "%hu".printf (variant.get_uint16 ()));
-            case "i":
-                string? nullable_text = "%'i".printf (variant.get_int32 ()).locale_to_utf8 (-1, null, null, null);
-                return (!) (nullable_text ?? "%i".printf (variant.get_int32 ()));           // TODO why is 'li' failing to display '-'?
-            case "u":
-                string? nullable_text = "%'u".printf (variant.get_uint32 ()).locale_to_utf8 (-1, null, null, null);
-                return (!) (nullable_text ?? "%u".printf (variant.get_uint32 ()));
-            case "x":
-                string? nullable_text = "%'lli".printf (variant.get_int64 ()).locale_to_utf8 (-1, null, null, null);
-                return (!) (nullable_text ?? "%lli".printf (variant.get_int64 ()));
-            case "t":
-                string? nullable_text = "%'llu".printf (variant.get_uint64 ()).locale_to_utf8 (-1, null, null, null);
-                return (!) (nullable_text ?? "%llu".printf (variant.get_uint64 ()));
-            case "d":
-                return variant.get_double ().to_string ();                                  // TODO something; notably, number of chars after coma
-            case "h":
-                string? nullable_text = "%'i".printf (variant.get_handle ()).locale_to_utf8 (-1, null, null, null);
-                return (!) (nullable_text ?? "%i".printf (variant.get_int32 ()));
-            default: break;
-        }
-        if (type.has_prefix ("m"))
-        {
-            Variant? maybe_variant = variant.get_maybe ();
-            if (maybe_variant == null)
-                return cool_boolean_text_value (null, false);
-            if (type == "mb")
-                return cool_boolean_text_value (((!) maybe_variant).get_boolean (), false);
-        }
-        return variant.print (false);
+        return !path.has_suffix ("/");
     }
 
-    public static string cool_boolean_text_value (bool? nullable_boolean, bool capitalized = true)
+    public static string get_base_path (string path)
     {
-        if (capitalized)
+        if (path.length <= 1)
+            return "/";
+        return path.slice (0, path.last_index_of_char ('/') + 1);
+    }
+
+    public static string get_name (string path)
+    {
+        if (path.length <= 1)
+            return "/";
+        if (is_key_path (path))
+            return path [path.last_index_of_char ('/') + 1 : path.length];
+        string tmp = path [0:-1];
+        return tmp [tmp.last_index_of_char ('/') + 1 : tmp.length];
+    }
+
+    public static string get_parent_path (string path)
+    {
+        if (path.length <= 1)
+            return "/";
+        return get_base_path (is_key_path (path) ? path : path [0:-1]);
+    }
+
+    /*\
+    * * Directory methods
+    \*/
+
+    public string get_fallback_path (string path)
+    {
+        string fallback_path = path;
+        if (is_key_path (path))
         {
-            if (nullable_boolean == true)
-                return _("True");
-            if (nullable_boolean == false)
-                return _("False");
-            return _("Nothing");
+            Key? key = get_key (path, "");
+            if (key != null)
+                return path;
+            fallback_path = get_parent_path (path);
         }
+
+        Directory? dir = get_directory (fallback_path);
+        while (dir == null)
+        {
+            fallback_path = get_parent_path (fallback_path);
+            dir = get_directory (fallback_path);
+        }
+        return fallback_path;
+    }
+
+    /*\
+    * * Key value methods
+    \*/
+
+    public Variant? get_key_properties (string full_name, string context)
+    {
+        Key? key = get_key (full_name, context);
+        if (key == null)
+            return null;
+
+        return ((!) key).properties;
+    }
+
+    public string get_key_copy_text (string full_name, string context)
+    {
+        Key? key = get_key (full_name, context);
+        if (key == null)
+            return full_name;
+
+        if ((!) key is GSettingsKey)
+            return ((!) key).descriptor + " " + get_gsettings_key_value ((GSettingsKey) key).print (false);
+
+        if (!((!) key is DConfKey))
+            assert_not_reached ();
+
+        Variant? key_value = get_dconf_key_value_or_null (full_name, client);
+        if (key_value == null)
+            return _("%s (key erased)").printf (full_name);
+        else
+            return ((!) key).descriptor + " " + ((!) key_value).print (false);
+    }
+
+    public Variant get_key_value (Key key)
+    {
+        if ((!) key is GSettingsKey)
+            return get_gsettings_key_value ((GSettingsKey) key);
+        if ((!) key is DConfKey)
+            return get_dconf_key_value ((DConfKey) key, client);
+        assert_not_reached ();
+    }
+
+    private static Variant get_gsettings_key_value (GSettingsKey key)
+    {
+        return key.settings.get_value (get_name (key.full_name));
+    }
+
+    private static Variant get_dconf_key_value (DConfKey key, DConf.Client client)
+    {
+        Variant? key_value = get_dconf_key_value_or_null (key.full_name, client);
+        if (key_value == null)
+            assert_not_reached ();
+        return (!) key_value;
+    }
+    private static Variant? get_dconf_key_value_or_null (string full_name, DConf.Client client)
+    {
+        return client.read (full_name);
+    }
+
+    public void set_key_value (Key key, Variant key_value)
+    {
+        if (key is GSettingsKey)
+            ((GSettingsKey) key).settings.set_value (key.name, key_value);
         else
         {
-            if (nullable_boolean == true)
-                return _("true");
-            if (nullable_boolean == false)
-                return _("false");
-            /* Translators: "nothing" here is a keyword that should appear for consistence; please translate as "yourtranslation (nothing)" */
-            return _("nothing");
+            set_dconf_value (key.full_name, key_value);
+            key.value_changed ();
         }
     }
 
-    protected static bool show_min_and_max (string type)
+    public void set_gsettings_key_value (string full_name, string schema_id, Variant key_value)
     {
-        return (type == "d" || type == "y" || type == "n" || type == "q" || type == "i" || type == "u" || type == "x" || type == "t");
-    }
-
-    public static uint64 get_variant_as_uint64 (Variant variant)
-    {
-        switch (variant.classify ())
+        Key? key = get_key (full_name, schema_id);
+        if (key == null)
         {
-            case Variant.Class.BYTE:    return (int64) variant.get_byte ();
-            case Variant.Class.UINT16:  return (int64) variant.get_uint16 ();
-            case Variant.Class.UINT32:  return (int64) variant.get_uint32 ();
-            case Variant.Class.UINT64:  return variant.get_uint64 ();
-            default: assert_not_reached ();
+            warning ("Non-existing key gsettings set-value request.");
+            set_dconf_value (full_name, key_value);
         }
-    }
-
-    public static int64 get_variant_as_int64 (Variant variant)
-    {
-        switch (variant.classify ())
+        else if ((!) key is GSettingsKey)
+            ((GSettingsKey) (!) key).settings.set_value (((!) key).name, key_value);
+        else if ((!) key is DConfKey)               // should not happen for now
         {
-            case Variant.Class.INT16:   return (int64) variant.get_int16 ();
-            case Variant.Class.INT32:   return (int64) variant.get_int32 ();
-            case Variant.Class.INT64:   return variant.get_int64 ();
-            case Variant.Class.HANDLE:  return (int64) variant.get_handle ();
-            default: assert_not_reached ();
+            warning ("Key without schema gsettings set-value request.");
+            set_dconf_value (full_name, key_value);
+            ((!) key).value_changed ();
+        }
+        else
+            assert_not_reached ();
+    }
+
+    public void set_dconf_key_value (string full_name, Variant key_value)
+    {
+        Key? key = get_key (full_name, "");
+        set_dconf_value (full_name, key_value);
+
+        if (key == null)
+            warning ("Non-existing key dconf set-value request.");
+        else
+        {
+            if (!(((!) key) is DConfKey))
+                warning ("Non-DConfKey key dconf set-value request.");
+            ((Key) (!) key).value_changed ();
         }
     }
-}
-
-public class DConfKey : Key
-{
-    public override string descriptor { owned get { return full_name; } }
-
-    private DConf.Client client;
-
-    public bool is_ghost { get; set; default = false; }
-    public void erase ()
+    private void set_dconf_value (string full_name, Variant? key_value)
     {
         try
         {
-            client.write_sync (full_name, null);
+            client.write_sync (full_name, key_value, out last_change_tag);
         }
         catch (Error error)
         {
             warning (error.message);
         }
-        is_ghost = true;
-        planned_change = false;
-        value_changed ();
     }
 
-    public override Variant value
+    public void set_key_to_default (string full_name, string schema_id)
     {
-        owned get
+        Key? key = get_key (full_name, schema_id);
+        if (key == null && !(key is GSettingsKey))
+            return; // TODO better
+
+        GLib.Settings settings = ((GSettingsKey) (!) key).settings;
+        settings.reset (((!) key).name);
+        if (settings.backend.get_type ().name () == "GDelayedSettingsBackend") // Workaround for https://bugzilla.gnome.org/show_bug.cgi?id=791290
+            settings.backend.changed (full_name, null);
+        // Alternative workaround: key.value_changed ();
+    }
+
+    public void erase_key (string full_name)
+    {
+        Key? key = get_key (full_name, "");
+        set_dconf_value (full_name, null);
+
+        if (key == null)
+            warning ("Non-existing key erase request.");
+        else
         {
-            return (!) client.read (full_name);
-        }
-        set
-        {
-            try
-            {
-                client.write_sync (full_name, value);
-            }
-            catch (Error error)
-            {
-                warning (error.message);
-            }
-            value_changed ();
-        }
-    }
-
-    public DConfKey (DConf.Client client, Directory parent, string name)
-    {
-        Object (nullable_parent: parent, name: name);
-
-        this.client = client;
-        this.type_string = value.get_type_string ();
-
-        VariantBuilder builder = new VariantBuilder (new VariantType ("(ba{ss})"));     // TODO add VariantBuilder add_parsed () function in vala/glib-2.0.vapi line ~5490
-        builder.add ("b",    false);
-        builder.open (new VariantType ("a{ss}"));
-        builder.add ("{ss}", "key-name",    name);
-        builder.add ("{ss}", "parent-path", parent.full_name);
-        builder.add ("{ss}", "type-code",   type_string);
-        builder.add ("{ss}", "type-name",   key_to_description (type_string));
-        if (show_min_and_max (type_string))
-        {
-            string min, max;
-            get_min_and_max_string (out min, out max, type_string);
-
-            builder.add ("{ss}", "minimum", min);
-            builder.add ("{ss}", "maximum", max);
-        }
-        builder.close ();
-        properties = builder.end ();
-    }
-}
-
-public class GSettingsKey : Key
-{
-    public string schema_id              { get; construct; }
-    public string summary                { get; construct; }
-    public string description    { private get; construct; }
-    public Variant default_value         { get; construct; }
-    public string range_type             { get; construct; }
-    public Variant range_content         { get; construct; }
-
-    public override string descriptor { owned get { return @"$schema_id $name"; } }
-
-    private GLib.Settings settings;
-
-    public override Variant value
-    {
-        owned get { return settings.get_value (name); }
-        set { settings.set_value (name, value); }
-    }
-
-    public bool is_default
-    {
-        get { return settings.get_user_value (name) == null; }
-    }
-
-    public void set_to_default ()
-    {
-        settings.reset (name);
-    }
-
-    public GSettingsKey (Directory parent, string name, GLib.Settings settings, string schema_id, string summary, string description, string type_string, Variant default_value, string range_type, Variant range_content)
-    {
-        Object (nullable_parent: parent,
-                name: name,
-                // schema infos
-                schema_id: schema_id,
-                summary: summary,
-                description: description,
-                default_value: default_value,       // TODO devel default/admin default
-                range_type: range_type,
-                range_content: range_content);
-
-        this.settings = settings;
-        settings.changed [name].connect (() => value_changed ());
-
-        this.type_string = type_string;
-
-        VariantBuilder builder = new VariantBuilder (new VariantType ("(ba{ss})"));
-        builder.add ("b",    true);
-        builder.open (new VariantType ("a{ss}"));
-        builder.add ("{ss}", "key-name",    name);
-        builder.add ("{ss}", "parent-path", parent.full_name);
-        builder.add ("{ss}", "type-code",   type_string);
-        builder.add ("{ss}", "type-name",   key_to_description (type_string));
-        builder.add ("{ss}", "schema-id",   schema_id);
-        builder.add ("{ss}", "summary",     summary);
-        builder.add ("{ss}", "description", description);
-        builder.add ("{ss}", "default-value", cool_text_value_from_variant (default_value, type_string));
-        if (show_min_and_max (type_string))
-        {
-            string min, max;
-            if (range_type == "range")     // TODO test more; and what happen if only min/max is in range?
-            {
-                min = cool_text_value_from_variant (range_content.get_child_value (0), type_string);
-                max = cool_text_value_from_variant (range_content.get_child_value (1), type_string);
-            }
-            else
-                get_min_and_max_string (out min, out max, type_string);
-
-            builder.add ("{ss}", "minimum", min);
-            builder.add ("{ss}", "maximum", max);
-        }
-        builder.close ();
-        properties = builder.end ();
-    }
-
-    public bool search_for (string text)
-    {
-        return summary.index_of (text) >= 0
-            || description.index_of (text) >= 0;  // TODO use the "in" keyword
-    }
-}
-
-public class SettingsModel : Object, Gtk.TreeModel
-{
-    private DConf.Client client = new DConf.Client ();
-    private Directory root;
-
-    public SettingsModel ()
-    {
-        SettingsSchemaSource? settings_schema_source = SettingsSchemaSource.get_default ();
-        root = new Directory (null, "/", client);
-
-        if (settings_schema_source != null)
-            parse_schemas ((!) settings_schema_source);
-
-        create_dconf_views (root);
-
-        client.watch_sync ("/");
-    }
-
-    public Directory get_root_directory ()
-    {
-        return root;
-    }
-
-    private void parse_schemas (SettingsSchemaSource settings_schema_source)
-    {
-        string [] non_relocatable_schemas;
-        string [] relocatable_schemas;
-
-        settings_schema_source.list_schemas (true, out non_relocatable_schemas, out relocatable_schemas);
-
-        foreach (string schema_id in non_relocatable_schemas)
-        {
-            SettingsSchema? settings_schema = settings_schema_source.lookup (schema_id, true);
-            if (settings_schema == null)
-                continue;       // TODO better
-
-            string schema_path = ((!) settings_schema).get_path ();
-            Directory view = create_gsettings_views (root, schema_path [1:schema_path.length]);
-            view.init_gsettings_keys ((!) settings_schema);
+            if (!(((!) key) is DConfKey))
+                warning ("Non-DConfKey key erase request.");
+            ((Key) (!) key).value_changed ();
         }
     }
 
-    /*\
-    * * Recursive creation of views (directories)
-    \*/
-
-    private Directory create_gsettings_views (Directory parent_view, string remaining)
+    public bool is_key_default (GSettingsKey key)
     {
-        if (remaining == "")
-            return parent_view;
-
-        string [] tokens = remaining.split ("/", 2);
-
-        Directory view = get_child (parent_view, tokens [0]);
-        return create_gsettings_views (view, tokens [1]);
+        GLib.Settings settings = key.settings;
+        return settings.get_user_value (key.name) == null;
     }
 
-    private void create_dconf_views (Directory view)
+    public bool is_key_ghost (DConfKey key)
     {
-        foreach (string item in client.list (view.full_name))
-            if (DConf.is_dir (view.full_name + item))
-                create_dconf_views (get_child (view, item [0:-1]));
+        return get_dconf_key_value_or_null (key.full_name, client) == null;
     }
 
-    private Directory get_child (Directory parent_view, string name)
+    public void apply_key_value_changes (HashTable<string, Variant?> changes)
     {
-        Directory? view = parent_view.child_map.lookup (name);
-        if (view != null)
-            return (!) view;
+        HashTable<string, GLib.Settings> delayed_settings_hashtable = new HashTable<string, GLib.Settings> (str_hash, str_equal);
+        DConf.Changeset dconf_changeset = new DConf.Changeset ();
+        changes.foreach ((key_name, planned_value) => {
+                Key? key = get_key (key_name);
+                if (key == null)
+                {
+                    // TODO change value anyway?
+                }
+                else if ((!) key is GSettingsKey)
+                {
+                    string key_descriptor = ((Key) (!) key).descriptor;
+                    string settings_descriptor = key_descriptor [0:key_descriptor.last_index_of_char (' ')]; // strip the key name
+                    GLib.Settings? settings = delayed_settings_hashtable.lookup (settings_descriptor);
+                    if (settings == null)
+                    {
+                        settings = ((GSettingsKey) (!) key).settings;
+                        ((!) settings).delay ();
+                        delayed_settings_hashtable.insert (settings_descriptor, (!) settings);
+                    }
 
-        Directory new_view = new Directory (parent_view, name, client);
-        parent_view.children.insert_sorted (new_view, (a, b) => { return strcmp (((Directory) a).name, ((Directory) b).name); });
-        parent_view.child_map.insert (name, new_view);
-        return new_view;
-    }
+                    if (planned_value == null)
+                    {
+                        ((!) settings).reset (((!) key).name);
+                        if (((!) settings).backend.get_type ().name () == "GDelayedSettingsBackend") // Workaround for https://bugzilla.gnome.org/show_bug.cgi?id=791290
+                            ((!) settings).backend.changed (((!) key).full_name, null);
+                        // Alternative workaround: key.value_changed ();
+                    }
+                    else
+                        ((!) settings).set_value (((!) key).name, (!) planned_value);
+                }
+                else if ((!) key is DConfKey)
+                    dconf_changeset.set (((!) key).full_name, planned_value);
+                else
+                    assert_not_reached ();
+            });
 
-    /*\
-    * * TreeModel things
-    \*/
+        delayed_settings_hashtable.foreach_remove ((key_descriptor, schema_settings) => { schema_settings.apply (); return true; });
 
-    public Gtk.TreeModelFlags get_flags()
-    {
-        return 0;
-    }
-
-    public int get_n_columns()
-    {
-        return 3;
-    }
-
-    public Type get_column_type (int index)
-    {
-        return index == 0 ? typeof (Directory) : typeof (string);
-    }
-
-    private void set_iter (ref Gtk.TreeIter iter, Directory directory)
-    {
-        iter.stamp = 0;
-        iter.user_data = directory;
-        iter.user_data2 = directory;
-        iter.user_data3 = directory;
-    }
-
-    public Directory get_directory (Gtk.TreeIter? iter)
-    {
-        return iter == null ? root : (Directory) ((!) iter).user_data;
-    }
-
-    public bool get_iter(out Gtk.TreeIter iter, Gtk.TreePath path)
-    {
-        iter = Gtk.TreeIter();
-
-        if (!iter_nth_child(out iter, null, path.get_indices()[0]))
-            return false;
-
-        for (int i = 1; i < path.get_depth(); i++)
+        try
         {
-            Gtk.TreeIter parent = iter;
-            if (!iter_nth_child(out iter, parent, path.get_indices()[i]))
-                return false;
+            client.change_sync (dconf_changeset, out last_change_tag);
         }
-
-        return true;
-    }
-
-    public Gtk.TreePath? get_path(Gtk.TreeIter iter)
-    {
-        var path = new Gtk.TreePath();
-        for (var d = get_directory(iter); d != root; d = d.parent)
-            path.prepend_index((int)d.index);
-        return path;
-    }
-
-    public void get_value (Gtk.TreeIter iter, int column, out Value value)
-    {
-        switch (column)
+        catch (Error error)
         {
-            case 0: value = get_directory (iter); break;
-            case 1: value = get_directory (iter).name; break;
-            case 2: value = get_directory (iter).full_name; break;
-            default: assert_not_reached ();
+            warning (error.message);
         }
-    }
-
-    public bool iter_next(ref Gtk.TreeIter iter)
-    {
-        var directory = get_directory(iter);
-        if (directory.index >= directory.parent.children.length() - 1)
-            return false;
-        set_iter(ref iter, directory.parent.children.nth_data(directory.index+1));
-
-        return true;
-    }
-
-    public bool iter_children(out Gtk.TreeIter iter, Gtk.TreeIter? parent)
-    {
-        iter = Gtk.TreeIter();
-
-        var directory = get_directory(parent);
-        if (directory.children.length() == 0)
-            return false;
-        set_iter(ref iter, directory.children.nth_data(0));
-
-        return true;
-    }
-
-    public bool iter_has_child(Gtk.TreeIter iter)
-    {
-        return get_directory(iter).children.length() > 0;
-    }
-
-    public int iter_n_children(Gtk.TreeIter? iter)
-    {
-        return (int) get_directory(iter).children.length();
-    }
-
-    public bool iter_nth_child(out Gtk.TreeIter iter, Gtk.TreeIter? parent, int n)
-    {
-        iter = Gtk.TreeIter();
-
-        var directory = get_directory(parent);
-        if (n >= directory.children.length())
-            return false;
-        set_iter(ref iter, directory.children.nth_data(n));
-
-        return true;
-    }
-
-    public bool iter_parent(out Gtk.TreeIter iter, Gtk.TreeIter child)
-    {
-        iter = Gtk.TreeIter();
-
-        var directory = get_directory(child);
-        if (directory.parent == root)
-            return false;
-
-        set_iter(ref iter, directory.parent);
-
-        return true;
-    }
-
-    public void ref_node(Gtk.TreeIter iter)
-    {
-        get_directory(iter).ref();
-    }
-
-    public void unref_node(Gtk.TreeIter iter)
-    {
-        get_directory(iter).unref();
     }
 }

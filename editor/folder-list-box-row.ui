@@ -2,6 +2,7 @@
 <interface>
   <!-- interface-requires gtk+ 3.0 -->
   <template class="FolderListBoxRow" parent="ClickableListBoxRow">
+    <property name="visible">True</property>
     <style>
       <class name="folder"/>
     </style>
@@ -14,6 +15,7 @@
             <property name="visible">True</property>
             <property name="vexpand">True</property>
             <property name="xalign">0</property>
+            <property name="ellipsize">end</property> <!-- Epiphany web apps during search... -->
             <style>
               <class name="key-name"/>
             </style>
