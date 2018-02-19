@@ -1,6 +1,7 @@
 dconf-editor (3.27.91-1) UNRELEASED; urgency=medium
 
   * New upstream development release (Closes: #704164)
+  * Build with meson
 
  -- Jeremy Bicha <jbicha@debian.org>  Mon, 19 Feb 2018 14:54:14 -0500
 

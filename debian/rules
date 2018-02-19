@@ -7,8 +7,5 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 %:
 	dh $@ --with gnome
 
-override_dh_autoreconf:
-	dh_autoreconf --as-needed
-
 override_dh_strip:
 	dh_strip --dbgsym-migration='dconf-editor-dbg (<< 3.20.1-1~)'
