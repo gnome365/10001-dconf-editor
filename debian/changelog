@@ -2,6 +2,7 @@ dconf-editor (3.27.91-1) UNRELEASED; urgency=medium
 
   * New upstream development release (Closes: #704164)
   * Build with meson
+  * Bump minimum libglib2.0-dev to 2.55.1
 
  -- Jeremy Bicha <jbicha@debian.org>  Mon, 19 Feb 2018 14:54:14 -0500
 
