@@ -1,10 +1,10 @@
-dconf-editor (3.27.91-1) UNRELEASED; urgency=medium
+dconf-editor (3.27.91-1) experimental; urgency=medium
 
   * New upstream development release (Closes: #704164)
   * Build with meson
   * Bump minimum libglib2.0-dev to 2.55.1
 
- -- Jeremy Bicha <jbicha@debian.org>  Mon, 19 Feb 2018 14:54:14 -0500
+ -- Jeremy Bicha <jbicha@debian.org>  Tue, 20 Feb 2018 17:03:25 -0500
 
 dconf-editor (3.26.2-3) unstable; urgency=medium
 
