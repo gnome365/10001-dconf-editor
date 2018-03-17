@@ -12,7 +12,7 @@
   GNU General Public License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with Dconf Editor.  If not, see <http://www.gnu.org/licenses/>.
+  along with Dconf Editor.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 using Gtk;
@@ -92,6 +92,11 @@ class RegistryInfo : Grid, BrowsableView
                 conflicting_key_warning_revealer.set_reveal_child (false);
                 hard_conflicting_key_error_revealer.set_reveal_child (false);
             }
+        }
+        else
+        {
+            conflicting_key_warning_revealer.set_reveal_child (false);
+            hard_conflicting_key_error_revealer.set_reveal_child (false);
         }
         no_schema_warning.set_reveal_child (!has_schema);
 
