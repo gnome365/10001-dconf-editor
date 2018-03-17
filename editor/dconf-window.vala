@@ -12,7 +12,7 @@
   GNU General Public License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with Dconf Editor.  If not, see <http://www.gnu.org/licenses/>.
+  along with Dconf Editor.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 using Gtk;
@@ -152,7 +152,8 @@ class DConfWindow : ApplicationWindow
         }
         else
         {
-            warning ("Unknown schema %s.".printf ((!) schema));
+            if ((!) schema != "")
+                warning (_("Unknown schema “%s”.").printf ((!) schema));
             if (settings.get_boolean ("restore-view"))
                 first_path = settings.get_string ("saved-view");
         }
@@ -593,15 +594,17 @@ class DConfWindow : ApplicationWindow
 
     private void request_search (bool reload)
     {
+        string selected_row = browser_view.get_selected_row_name ();
         if (reload)
         {
             reload_search_action.set_enabled (false);
-            browser_view.set_search_parameters (current_path, bookmarks_button.get_bookmarks ());
+            browser_view.set_search_parameters (saved_view, bookmarks_button.get_bookmarks ());
             reload_search_next = false;
         }
-        string selected_row = browser_view.get_selected_row_name ();
         update_current_path (ViewType.SEARCH, search_entry.text);
         browser_view.select_row (selected_row);
+        if (!search_entry.has_focus)
+            search_entry.grab_focus_without_selecting ();
     }
 
     private void reload_view ()

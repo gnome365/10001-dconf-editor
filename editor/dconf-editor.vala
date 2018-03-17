@@ -12,14 +12,16 @@
   GNU General Public License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with Dconf Editor.  If not, see <http://www.gnu.org/licenses/>.
+  along with Dconf Editor.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 class ConfigurationEditor : Gtk.Application
 {
     public static string [,] internal_mappings = {
             {"ca.desrt.dconf-editor.Bookmarks",
-                "/ca/desrt/dconf-editor/"}
+                "/ca/desrt/dconf-editor/"},
+            {"ca.desrt.dconf-editor.Demo.EmptyRelocatable",
+                "/ca/desrt/dconf-editor/Demo/EmptyRelocatable/"}
         };
     public static string [,] known_mappings = {
             {"com.gexperts.Tilix.Profile",
@@ -165,7 +167,7 @@ class ConfigurationEditor : Gtk.Application
 
     public ConfigurationEditor ()
     {
-        Object (application_id: "ca.desrt.dconf-editor", flags: ApplicationFlags.HANDLES_COMMAND_LINE);
+        Object (application_id: "ca.desrt.dconf-editor", flags: ApplicationFlags.HANDLES_COMMAND_LINE|ApplicationFlags.HANDLES_OPEN);
 
 //        TODO needs gio-2.0 >= 2.56
 //        set_option_context_parameter_string (_("..."));
@@ -297,6 +299,12 @@ class ConfigurationEditor : Gtk.Application
         simple_activation ();
     }
 
+    protected override void open (GLib.File [] files, string hint)
+    {
+        warning ("Flatpak test, " + files.length.to_string () + " files.");
+        simple_activation ();
+    }
+
     protected override int command_line (ApplicationCommandLine commands)
     {
         string [] args = {};
@@ -317,7 +325,7 @@ class ConfigurationEditor : Gtk.Application
             return Posix.EXIT_FAILURE;
         }
 
-        string arg0 = args [0];
+        string arg0 = strdup (args [0]);
         if (" " in arg0)
         {
             if (args.length == 1)
@@ -338,15 +346,18 @@ class ConfigurationEditor : Gtk.Application
 
         if (arg0.has_prefix ("/"))
         {
-            int ret = Posix.EXIT_SUCCESS;
+            Gtk.Window window = get_new_window (null, arg0, null);
             if (args.length == 2)
             {
                 commands.print (_("Cannot understand second argument in this context.\n"));
-                ret = Posix.EXIT_FAILURE;
+                window.present ();
+                return Posix.EXIT_FAILURE;
             }
-            Gtk.Window window = get_new_window (null, arg0, null);
-            window.present ();
-            return ret;
+            else
+            {
+                window.present ();
+                return Posix.EXIT_SUCCESS;
+            }
         }
 
         string? key_name = null;

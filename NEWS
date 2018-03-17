@@ -1,3 +1,54 @@
+dconf-editor 3.28.0
+=====================
+
+All looks good for a new stable release. Many changes in the UI, many changes in
+the backend, some real improvements that –I hope– will please every user of this
+3.28 release. Needs to be highlighted, the rework of the list of keys look, some
+fixes in the backend with notably the support of relocatable schemas (a function
+that was asked regularly) and a refresh of the schema list, and a first revision
+of an improved search function.
+
+Translations updated:
+  Croatian: gogo
+  Danish: Ask Hjorth Larsen
+  British English: Bruce Cowan
+  French: Alain Lojewski
+  German: Tim Sabsch
+  Italian: Milo Casagrande
+  Latvian: Rūdolfs Mazurs
+  Serbian and Serbian Latin: Марко Костић and Милош Поповић
+  Swedish: Anders Jonsson
+  Turkish: Muhammet Kara
+
+dconf-editor 3.27.92
+=====================
+
+Small fixes of corner cases, it looks good for a clean release. I’m just annoyed
+by the impossibility of opening a path from command-line when in a Flatpack, but
+I don’t consider this packaging format as supported for now, so fixes will come.
+
+Translations updated:
+  all: Arnaud Bonatti
+  Catalan: Jordi Mas
+  Czech: Marek Černocký
+  Danish: Ask Hjorth Larsen
+  Dutch: Nathan Follens
+  Finnish: Jiri Grönroos
+  Friulian: Fabio Tomat
+  Galician: Fran Dieguez
+  German: Tim Sabsch
+  Hungarian: Balázs Úr
+  Indonesian: Kukuh Syafaat
+  Kazakh: Baurzhan Muftakhidinov
+  Korean: Changwoo Ryu
+  Lithuanian: Aurimas Černius
+  Occitan: Cédric Valmary
+  Polish: Piotr Drąg
+  Brazilian Portuguese: Rafael Fontenelle
+  Serbian: Марко Костић
+  Serbian Latin: Милош Поповић
+  Turkish: Emin Tufan Çetin
+
 dconf-editor 3.27.91
 =====================
 
