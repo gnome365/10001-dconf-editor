@@ -55,8 +55,8 @@
   <!ELEMENT range EMPTY >
   <!-- min and max must be parseable as values of the key type and
        min must be less than or equal to max -->
-  <!ATTLIST range min CDATA #REQUIRED
-                  max CDATA #REQUIRED >
+  <!ATTLIST range min CDATA #IMPLIED
+                  max CDATA #IMPLIED >
 
   <!-- choices is only allowed for keys with string or string array type -->
   <!ELEMENT choices (choice+) >
@@ -98,11 +98,13 @@
     <child schema="ca.desrt.dconf-editor.Demo" name="demo"/>
     <key name="window-width" type="i">
       <default>800</default>
+      <range min="630"/>
       <summary>The width of the window</summary>
       <description>The width of the main window in pixels.</description>
     </key>
     <key name="window-height" type="i">
       <default>600</default>
+      <range min="420"/>
       <summary>The height of the window</summary>
       <description>The height of the main window in pixels.</description>
     </key>
@@ -178,6 +180,11 @@
       <summary>Mapping of paths to manually associated schemas</summary>
       <description>A dictionary that maps schema IDs with path specifications. It is used to allow the user to associate a relocatable schema to certain paths. Path specifications may contain wildcards in the form of empty segments (e.g. /ca/desrt/dconf-editor//), defining possibly multiple paths. The same schema ID may be associated with multiple path specifications.</description>
     </key>
+    <key name="use-shortpaths" type="b">
+      <default>false</default>
+      <summary>A flag for skipping unnecessary subfolders</summary>
+      <description>When a folder only contains one subfolder and no keys, Dconf Editor can jump to that subfolder directly. This flag enables that behaviour.</description>
+    </key>
   </schema>
   <schema id="ca.desrt.dconf-editor.Bookmarks">
     <key name="bookmarks" type="as">
@@ -251,6 +258,16 @@
       <summary>A D-Bus signature, type ‘g’</summary>
       <description>A D-Bus signature is a string used as type signature for a D-Bus method or message.&#xA;&#xA;If you are not interacting with D-Bus, then there is no reason to make use of this type.</description>
     </key>
+    <key name="dict-entry" type="{ss}">
+      <default>{'color', 'red'}</default>
+      <summary>A dictionary entry of type ‘{ss}’</summary>
+      <description>A dictionary maps values of a basic type to another value (of any type). A dictionary entry is one such mapping.</description>
+    </key>
+    <key name="dictionary" type="a{sv}">
+      <default>{'title': &#60;'Example'&#62;, 'character': &#60;uint32 56&#62;, 'bold': &#60;true&#62;}</default>
+      <summary>A “vardict”, type ‘a{sv}’</summary>
+      <description>A dictionary maps values of a basic type to another value (of any type). One simple use case is to map strings to variants.</description>
+    </key>
     <key name="double" type="d">
       <default>3.1415926535897933</default>
       <summary>A double, type ‘d’</summary>
@@ -305,6 +322,7 @@
     </key>
     <key name="pair-of-integers" type="(ii)">
       <default>(800, 600)</default>
+      <!-- Translators: do not forget the parenthesis, they are meaningful. -->
       <summary>A custom type, here ‘(ii)’</summary>
       <description>Dconf Editor lets you edit any settings type supported by GSettings, falling back on a string entry when it doesn’t have a better way to do. Here is a tuple of two 32-bit signed integers.</description>
     </key>
@@ -323,6 +341,11 @@
       <summary>A nullable string, type ‘ms’</summary>
       <description>GSettings allows nullable types, that are similar to other types but could take a “nothing” value. A nullable string can take any string as value, including the empty string “''”, or can be NULL (nothing).</description>
     </key>
+    <key name="variant" type="v">
+      <default>&#60;@mmb just nothing&#62;</default>
+      <summary>A variant, type ‘v’</summary>
+      <description>Variants could be stored inside variants, and consequently as a GSettings type. Their representation use the XML brackets (‘&#60;’ and ‘&#62;’ characters, in a gschema file “&amp;#60;” and “&amp;#62;” respectively), with a parsable representation of their content inside. If unclear, the type can be given in the value with a prefix annotation like “@x” (where “x” is the type string) or “int64”. See https://developer.gnome.org/glib/stable/gvariant-text.html for complete documentation.</description>
+    </key>
     <key name="weird-enum" enum="ca.desrt.dconf-editor.DemoWeirdEnum">
       <default>'only-choice'</default>
       <summary>A 1-choice enumeration</summary>
@@ -333,6 +356,11 @@
       <range min="5" max="5"/>
       <summary>A 1-choice integer value</summary>
       <description>A range could limit an integer key to only allow one value, but that’s probably an error. Dconf Editor warns you in that case.</description>
+    </key>
+    <key name="weird-triv" type="()">
+      <default>()</default>
+      <summary>The empty tuple, type and value “()”</summary>
+      <description>There’s an empty tuple type (called sometimes “triv”) that is a tuple with no content, and can only take “()” as value.</description>
     </key>
   </schema>
   <schema id="ca.desrt.dconf-editor.Demo.Empty" path="/ca/desrt/dconf-editor/Demo/Empty/">

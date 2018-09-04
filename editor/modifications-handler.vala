@@ -15,60 +15,38 @@
   along with Dconf Editor.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-public enum Behaviour {
+internal enum Behaviour {
     UNSAFE,
     SAFE,
     ALWAYS_CONFIRM_IMPLICIT,
     ALWAYS_CONFIRM_EXPLICIT,
     ALWAYS_DELAY
 }
-public enum ModificationsMode {
+internal enum ModificationsMode {
     NONE,
     TEMPORARY,
     DELAYED
 }
 
-class ModificationsHandler : Object
+private class ModificationsHandler : Object
 {
-    public ModificationsMode mode { get; set; default=ModificationsMode.NONE; }
+    internal ModificationsMode mode { get; set; default=ModificationsMode.NONE; }
 
     private HashTable<string, Variant?> keys_awaiting_hashtable = new HashTable<string, Variant?> (str_hash, str_equal);
 
-    public uint dconf_changes_count
-    {
-        get
-        {
-            uint count = 0;
-            keys_awaiting_hashtable.@foreach ((key_path, planned_value) => {
-                    Key? key = model.get_key (key_path);
-                    if (key != null && (!) key is DConfKey)
-                        count++;
-                });
-            return count;
-        }
-    }
-    public uint gsettings_changes_count
-    {
-        get
-        {
-            uint count = 0;
-            keys_awaiting_hashtable.@foreach ((key_path, planned_value) => {
-                    Key? key = model.get_key (key_path);
-                    if (key != null && (!) key is GSettingsKey)
-                        count++;
-                });
-            return count;
-        }
-    }
+    private GenericSet<string> dconf_changes_set = new GenericSet<string> (str_hash, str_equal);
+    private HashTable<string, uint16> gsettings_changes_set = new HashTable<string, uint16> (str_hash, str_equal);
+    internal uint dconf_changes_count { get { return dconf_changes_set.length; }}
+    internal uint gsettings_changes_count { get { return gsettings_changes_set.length; }}
 
-    public SettingsModel model { get; construct; }
+    public SettingsModel model { internal get; internal construct; }
 
-    public signal void leave_delay_mode ();
-    public signal void delayed_changes_changed ();
+    internal signal void leave_delay_mode ();
+    internal signal void delayed_changes_changed ();
 
-    public Behaviour behaviour { get; set; }
+    internal Behaviour behaviour { get; set; }
 
-    public ModificationsHandler (SettingsModel model)
+    internal ModificationsHandler (SettingsModel model)
     {
         Object (model: model);
     }
@@ -77,12 +55,12 @@ class ModificationsHandler : Object
     * * Public calls
     \*/
 
-    public bool get_current_delay_mode ()
+    internal bool get_current_delay_mode ()
     {
         return mode == ModificationsMode.DELAYED || behaviour == Behaviour.ALWAYS_DELAY;
     }
 
-    public bool should_delay_apply (string type_string)
+    internal bool should_delay_apply (string type_string)
     {
         if (get_current_delay_mode () || behaviour == Behaviour.ALWAYS_CONFIRM_IMPLICIT || behaviour == Behaviour.ALWAYS_CONFIRM_EXPLICIT)
             return true;
@@ -93,33 +71,49 @@ class ModificationsHandler : Object
         assert_not_reached ();
     }
 
-    public void enter_delay_mode ()
+    internal void enter_delay_mode ()
     {
         mode = ModificationsMode.DELAYED;
 
         delayed_changes_changed ();
     }
 
-    public void add_delayed_setting (string key_path, Variant? new_value)
+    internal void add_delayed_setting (string key_path, Variant? new_value, uint16 context_id)
+        requires (!ModelUtils.is_folder_context_id (context_id))
     {
-        keys_awaiting_hashtable.insert (key_path, new_value);
+        if (!keys_awaiting_hashtable.contains (key_path))
+        {
+            if (ModelUtils.is_dconf_context_id (context_id))
+                dconf_changes_set.add (key_path);
+            else
+                gsettings_changes_set.insert (key_path, context_id);
+            keys_awaiting_hashtable.insert (key_path, new_value);
+        }
+        else
+            keys_awaiting_hashtable.replace (key_path, new_value);
 
         mode = get_current_delay_mode () ? ModificationsMode.DELAYED : ModificationsMode.TEMPORARY;
 
         delayed_changes_changed ();
     }
 
-    public void dismiss_change (string key_path)
+    internal void dismiss_change (string key_path)
     {
         if (mode == ModificationsMode.NONE)
             mode = behaviour == Behaviour.ALWAYS_DELAY ? ModificationsMode.DELAYED : ModificationsMode.TEMPORARY;
 
-        keys_awaiting_hashtable.remove (key_path);
+        if (keys_awaiting_hashtable.remove (key_path))
+        {
+            if (!gsettings_changes_set.remove (key_path)
+             && !dconf_changes_set.remove (key_path))
+                assert_not_reached ();
+        }
+        // else...  // happens on the second edit with unparsable value in a KeyEditorChildDefault
 
         delayed_changes_changed ();
     }
 
-    public void path_changed ()
+    internal void path_changed ()
     {
         if (mode != ModificationsMode.TEMPORARY)
             return;
@@ -131,73 +125,80 @@ class ModificationsHandler : Object
             assert_not_reached ();
     }
 
-    public void apply_delayed_settings ()
+    internal void apply_delayed_settings ()
     {
         mode = ModificationsMode.NONE;
 
         model.apply_key_value_changes (keys_awaiting_hashtable);
+        gsettings_changes_set.remove_all ();
+        dconf_changes_set.remove_all ();
         keys_awaiting_hashtable.remove_all ();
 
         delayed_changes_changed ();
         leave_delay_mode ();
     }
 
-    public void dismiss_delayed_settings ()
+    internal void dismiss_delayed_settings ()
     {
         mode = ModificationsMode.NONE;
 
+        gsettings_changes_set.remove_all ();
+        dconf_changes_set.remove_all ();
         keys_awaiting_hashtable.remove_all ();
 
         delayed_changes_changed ();
         leave_delay_mode ();
     }
 
-    public Variant get_key_custom_value (Key key)
+    internal Variant get_key_custom_value (string full_name, uint16 context_id)
     {
-        bool planned_change = key_has_planned_change (key.full_name);
-        Variant? planned_value = get_key_planned_value (key.full_name);
-        return planned_change && (planned_value != null) ? (!) planned_value : model.get_key_value (key);
+        bool planned_change = key_has_planned_change (full_name);
+        Variant? planned_value = get_key_planned_value (full_name);
+        if (planned_change && (planned_value != null))
+            return (!) planned_value;
+
+        RegistryVariantDict properties = new RegistryVariantDict.from_aqv (model.get_key_properties (full_name, context_id, (uint16) PropertyQuery.KEY_VALUE));
+        Variant key_value;
+        if (!properties.lookup (PropertyQuery.KEY_VALUE, "v", out key_value))
+            assert_not_reached ();
+        properties.clear ();
+        return key_value;
     }
 
-    public bool key_value_is_default (GSettingsKey key) // doesn't make sense for DConfKey?
-    {
-        bool planned_change = key_has_planned_change (key.full_name);
-        Variant? planned_value = get_key_planned_value (key.full_name);
-        return planned_change ? planned_value == null : model.is_key_default (key);
-    }
-
-    public void set_dconf_key_value (string full_name, Variant key_value)
+    internal void set_dconf_key_value (string full_name, Variant key_value)
     {
         model.set_dconf_key_value (full_name, key_value);
     }
 
-    public void set_gsettings_key_value (string full_name, string schema_id, Variant key_value)
+    internal void set_gsettings_key_value (string full_name, uint16 context_id, Variant key_value)
     {
-        model.set_gsettings_key_value (full_name, schema_id, key_value);
+        model.set_gsettings_key_value (full_name, context_id, key_value);
     }
 
-    public void erase_dconf_key (string full_name)
+    internal void erase_dconf_key (string full_name)
     {
         if (get_current_delay_mode ())
-            add_delayed_setting (full_name, null);
+            add_delayed_setting (full_name, null, ModelUtils.dconf_context_id);
         else if (behaviour != Behaviour.UNSAFE)
         {
             mode = ModificationsMode.DELAYED;   // call only once delayed_changes_changed()
-            add_delayed_setting (full_name, null);
+            add_delayed_setting (full_name, null, ModelUtils.dconf_context_id);
         }
         else
             model.erase_key (full_name);
     }
 
-    public void set_to_default (string full_name, string schema_id)
+    internal void set_to_default (string full_name, uint16 context_id)
+        requires (!ModelUtils.is_folder_context_id (context_id))
+        requires (!ModelUtils.is_dconf_context_id (context_id))
     {
         if (get_current_delay_mode ())
-            add_delayed_setting (full_name, null);
+            add_delayed_setting (full_name, null, context_id);
         else
-            model.set_key_to_default (full_name, schema_id);
+            model.set_key_to_default (full_name, context_id);
     }
 
-    public bool key_has_planned_change (string key_path)
+    internal bool key_has_planned_change (string key_path)
     {
         if (keys_awaiting_hashtable.contains (key_path))
             return true;
@@ -210,7 +211,7 @@ class ModificationsHandler : Object
         return has_planned_changed;
     }
 
-    public Variant? get_key_planned_value (string key_path)
+    internal Variant? get_key_planned_value (string key_path)
     {
         if (keys_awaiting_hashtable.contains (key_path))
             return keys_awaiting_hashtable.lookup (key_path);
@@ -223,13 +224,22 @@ class ModificationsHandler : Object
         return planned_changed;
     }
 
-    public ListStore get_delayed_settings ()
+    internal ListStore get_delayed_settings ()
     {
-        ListStore delayed_settings_list = new ListStore (typeof (Key));
+        ListStore delayed_settings_list = new ListStore (typeof (SimpleSettingObject));
         keys_awaiting_hashtable.@foreach ((key_path, planned_value) => {
-                Key? key = model.get_key (key_path);
-                if (key != null)    // TODO better
-                    delayed_settings_list.append ((!) key);
+                if (dconf_changes_set.contains (key_path))
+                    delayed_settings_list.append (
+                        new SimpleSettingObject.from_full_name (ModelUtils.dconf_context_id,
+                                                                key_path.slice (key_path.last_index_of_char ('/') + 1, key_path.length),
+                                                                key_path));
+                else if (gsettings_changes_set.contains (key_path))
+                    delayed_settings_list.append (
+                        new SimpleSettingObject.from_full_name (gsettings_changes_set.lookup (key_path),
+                                                                key_path.slice (key_path.last_index_of_char ('/') + 1, key_path.length),
+                                                                key_path));
+                else
+                    assert_not_reached ();
             });
         return delayed_settings_list;
     }

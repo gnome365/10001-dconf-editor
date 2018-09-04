@@ -18,10 +18,10 @@
 using Gtk;
 
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/modifications-revealer.ui")]
-class ModificationsRevealer : Revealer
+private class ModificationsRevealer : Revealer
 {
     private ModificationsHandler _modifications_handler;
-    public ModificationsHandler modifications_handler
+    internal ModificationsHandler modifications_handler
     {
         private get { return _modifications_handler; }
         set
@@ -42,6 +42,9 @@ class ModificationsRevealer : Revealer
     construct
     {
         delayed_settings_listbox.set_header_func (delayed_setting_row_update_header);
+
+        apply_button.icon = null;
+        apply_button.get_style_context ().add_class ("text-button");
     }
 
     /*\
@@ -49,20 +52,26 @@ class ModificationsRevealer : Revealer
     \*/
 
     [GtkCallback]
-    private void on_size_allocate (Allocation allocation)
+    private void on_size_allocate (Allocation allocation)   // TODO remaining warnings printed on redim when allocation width passes 900
     {
         StyleContext context = apply_button.get_style_context ();
         if (allocation.width < 900)
         {
-            context.remove_class ("text-button");
-            apply_button.icon = apply_button_icon;
-            context.add_class ("image-button");
+            if (apply_button.icon == null)
+            {
+                context.remove_class ("text-button");
+                apply_button.icon = apply_button_icon;
+                context.add_class ("image-button");
+            }
         }
         else
         {
-            context.remove_class ("image-button");
-            apply_button.icon = null;
-            context.add_class ("text-button");
+            if (apply_button.icon != null)
+            {
+                context.remove_class ("image-button");
+                apply_button.icon = null;
+                context.add_class ("text-button");
+            }
         }
     }
 
@@ -70,42 +79,50 @@ class ModificationsRevealer : Revealer
     * * Reseting objects
     \*/
 
-    public void reset_objects (GLib.ListStore? objects, bool recursively)
+    internal void reset_objects (string base_path, Variant? objects, bool recursively)
     {
-        _reset_objects (objects, recursively);
+        _reset_objects (base_path, objects, recursively);
         warn_if_no_planned_changes ();
     }
 
-    private void _reset_objects (GLib.ListStore? objects, bool recursively)
+    private void _reset_objects (string base_path, Variant? objects, bool recursively)
     {
-        SettingsModel model = modifications_handler.model;
         if (objects == null)
             return;
+        SettingsModel model = modifications_handler.model;
 
-        for (uint position = 0;; position++)
+        VariantIter iter = new VariantIter ((!) objects);
+        uint16 context_id;
+        string name;
+        while (iter.next ("(qs)", out context_id, out name))
         {
-            Object? object = ((!) objects).get_object (position);
-            if (object == null)
-                return;
-
-            SettingObject setting_object = (SettingObject) ((!) object);
-            if (setting_object is Directory)
+            // directory
+            if (ModelUtils.is_folder_context_id (context_id))
             {
+                string full_name = ModelUtils.recreate_full_name (base_path, name, true);
                 if (recursively)
-                {
-                    GLib.ListStore? children = model.get_children (setting_object.full_name);
-                    if (children != null)
-                        _reset_objects ((!) children, true);
-                }
-                continue;
+                    _reset_objects (full_name, model.get_children (full_name), true);
             }
-            if (setting_object is DConfKey)
+            // dconf key
+            else if (ModelUtils.is_dconf_context_id (context_id))
             {
-                if (!model.is_key_ghost ((DConfKey) setting_object))
-                    modifications_handler.add_delayed_setting (setting_object.full_name, null);
+                string full_name = ModelUtils.recreate_full_name (base_path, name, false);
+                if (!model.is_key_ghost (full_name))
+                    modifications_handler.add_delayed_setting (full_name, null, ModelUtils.dconf_context_id);
             }
-            else if (!model.is_key_default ((GSettingsKey) setting_object))
-                modifications_handler.add_delayed_setting (setting_object.full_name, null);
+            // gsettings
+            else
+            {
+                string full_name = ModelUtils.recreate_full_name (base_path, name, false);
+                RegistryVariantDict properties = new RegistryVariantDict.from_aqv (model.get_key_properties (full_name, context_id, (uint16) (PropertyQuery.IS_DEFAULT)));
+                bool is_key_default;
+                if (!properties.lookup (PropertyQuery.IS_DEFAULT,       "b",    out is_key_default))
+                    assert_not_reached ();
+                properties.clear ();
+
+                if (!is_key_default)
+                    modifications_handler.add_delayed_setting (full_name, null, context_id);
+            }
         }
     }
 
@@ -119,7 +136,7 @@ class ModificationsRevealer : Revealer
     * * Modifications list public functions
     \*/
 
-    public bool dismiss_selected_modification ()
+    internal bool dismiss_selected_modification ()
     {
         if (!delayed_list_button.active)
             return false;
@@ -133,17 +150,17 @@ class ModificationsRevealer : Revealer
         return true;
     }
 
-    public void hide_modifications_list ()
+    internal void hide_modifications_list ()
     {
         delayed_settings_list_popover.popdown ();
     }
 
-    public void toggle_modifications_list ()
+    internal void toggle_modifications_list ()
     {
         delayed_list_button.active = !delayed_settings_list_popover.visible;
     }
 
-    public bool get_modifications_list_state ()
+    internal bool get_modifications_list_state ()
     {
         return delayed_list_button.active;
     }
@@ -152,24 +169,46 @@ class ModificationsRevealer : Revealer
     * * Modifications list population
     \*/
 
-    private Widget delayed_setting_row_create (Object key)
+    private Widget delayed_setting_row_create (Object object)
     {
-        string full_name = ((Key) key).full_name;
-        bool has_schema = key is GSettingsKey;
-        bool is_default_or_ghost = has_schema ? modifications_handler.model.is_key_default ((GSettingsKey) key)
-                                              : modifications_handler.model.is_key_ghost ((DConfKey) key);
+        string full_name = ((SimpleSettingObject) object).full_name;
+        uint16 context_id = ((SimpleSettingObject) object).context_id;
+
+        SettingsModel model = modifications_handler.model;
+
+        RegistryVariantDict properties = new RegistryVariantDict.from_aqv (model.get_key_properties (full_name, context_id, (uint16) (PropertyQuery.HAS_SCHEMA & PropertyQuery.IS_DEFAULT & PropertyQuery.DEFAULT_VALUE & PropertyQuery.KEY_VALUE)));
+
+        bool has_schema;
+        if (!properties.lookup (PropertyQuery.HAS_SCHEMA,               "b",    out has_schema))
+            assert_not_reached ();
+
+        bool has_schema_and_is_default;
+        if (!has_schema)
+            has_schema_and_is_default = false;
+        else if (!properties.lookup (PropertyQuery.IS_DEFAULT,          "b",    out has_schema_and_is_default))
+            assert_not_reached ();
+
         Variant? planned_value = modifications_handler.get_key_planned_value (full_name);
         string? cool_planned_value = null;
         if (planned_value != null)
-            cool_planned_value = Key.cool_text_value_from_variant ((!) planned_value, ((Key) key).type_string);
+            cool_planned_value = Key.cool_text_value_from_variant ((!) planned_value);
+
         string? cool_default_value = null;
-        if (has_schema)
-            cool_default_value = Key.cool_text_value_from_variant (((GSettingsKey) key).default_value, ((Key) key).type_string);
-        string cool_key_value = Key.cool_text_value_from_variant (modifications_handler.model.get_key_value ((Key) key),
-                                                                                                             ((Key) key).type_string);
-        DelayedSettingView view = new DelayedSettingView (full_name,
-                                                          is_default_or_ghost,
-                                                          cool_key_value,
+        if (has_schema
+         && !properties.lookup (PropertyQuery.DEFAULT_VALUE,            "s",    out cool_default_value))
+            assert_not_reached ();
+
+        Variant key_value;
+        if (!properties.lookup (PropertyQuery.KEY_VALUE,                "v",    out key_value))
+            assert_not_reached ();
+
+        properties.clear ();
+
+        DelayedSettingView view = new DelayedSettingView (((SimpleSettingObject) object).name,
+                                                          full_name,
+                                                          context_id,
+                                                          has_schema_and_is_default,    // at row creation, key is never ghost
+                                                          key_value,
                                                           cool_planned_value,
                                                           cool_default_value);
 
@@ -177,8 +216,8 @@ class ModificationsRevealer : Revealer
         wrapper.add (view);
         if (modifications_handler.get_current_delay_mode ())
         {
-            Variant variant = new Variant ("(ss)", full_name, has_schema ? ((GSettingsKey) key).schema_id : ".dconf");
-            wrapper.set_detailed_action_name ("ui.open-object(" + variant.print (false) + ")");
+            Variant variant = new Variant ("(sq)", full_name, context_id);
+            wrapper.set_detailed_action_name ("ui.open-object(" + variant.print (true) + ")");
         }
         return wrapper;
     }
@@ -193,7 +232,7 @@ class ModificationsRevealer : Revealer
         {
             string before_key_name = ((DelayedSettingView) ((!) before).get_child ()).full_name;
 
-            if (SettingsModel.get_parent_path (row_key_name) != SettingsModel.get_parent_path (before_key_name))
+            if (ModelUtils.get_parent_path (row_key_name) != ModelUtils.get_parent_path (before_key_name))
                 add_location_header = true;
         }
 
@@ -203,7 +242,7 @@ class ModificationsRevealer : Revealer
             location_header.show ();
             location_header.orientation = Orientation.VERTICAL;
 
-            Label location_header_label = new Label (SettingsModel.get_parent_path (row_key_name));
+            Label location_header_label = new Label (ModelUtils.get_parent_path (row_key_name));
             location_header_label.show ();
             location_header_label.hexpand = true;
             location_header_label.halign = Align.START;
@@ -230,13 +269,35 @@ class ModificationsRevealer : Revealer
     }
 
     /*\
-    * * Update
+    * * Updating values; TODO only works for watched keys...
+    \*/
+
+    internal void gkey_value_push (string full_name, uint16 context_id, Variant key_value, bool is_key_default)
+    {
+        delayed_settings_listbox.foreach ((widget) => {
+                DelayedSettingView row = (DelayedSettingView) ((Bin) widget).get_child ();
+                if (row.full_name == full_name && row.context_id == context_id)
+                    row.update_gsettings_key_current_value (key_value, is_key_default);
+            });
+    }
+
+    internal void dkey_value_push (string full_name, Variant? key_value_or_null)
+    {
+        delayed_settings_listbox.foreach ((widget) => {
+                DelayedSettingView row = (DelayedSettingView) ((Bin) widget).get_child ();
+                if (row.full_name == full_name)
+                    row.update_dconf_key_current_value (key_value_or_null);
+            });
+    }
+
+    /*\
+    * * Updating text
     \*/
 
     private void update ()
     {
         GLib.ListStore modifications_list = modifications_handler.get_delayed_settings ();
-        delayed_settings_listbox.bind_model (modifications_handler.get_delayed_settings (), delayed_setting_row_create);
+        delayed_settings_listbox.bind_model (modifications_list, delayed_setting_row_create);
         if (modifications_list.get_n_items () == 0)
             delayed_settings_list_popover.popdown ();
         else

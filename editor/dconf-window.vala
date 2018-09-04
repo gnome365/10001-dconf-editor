@@ -18,7 +18,7 @@
 using Gtk;
 
 [Flags]
-enum RelocatableSchemasEnabledMappings
+internal enum RelocatableSchemasEnabledMappings
 {
     USER,
     BUILT_IN,
@@ -26,14 +26,14 @@ enum RelocatableSchemasEnabledMappings
     STARTUP
 }
 
-public enum ViewType {
+internal enum ViewType {
     OBJECT,
     FOLDER,
     SEARCH
 }
 
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/dconf-editor.ui")]
-class DConfWindow : ApplicationWindow
+private class DConfWindow : ApplicationWindow
 {
     private ViewType current_type = ViewType.FOLDER;
     private string current_path = "/";
@@ -49,9 +49,9 @@ class DConfWindow : ApplicationWindow
     private bool window_is_maximized = false;
     private bool window_is_tiled = false;
 
-    public bool mouse_extra_buttons { private get; set; default = true; }
-    public int mouse_back_button { private get; set; default = 8; }
-    public int mouse_forward_button { private get; set; default = 9; }
+    internal bool mouse_extra_buttons   { private get; set; default = true; }
+    internal int mouse_back_button      { private get; set; default = 8; }
+    internal int mouse_forward_button   { private get; set; default = 9; }
 
     private GLib.Settings settings = new GLib.Settings ("ca.desrt.dconf-editor.Settings");
 
@@ -67,25 +67,30 @@ class DConfWindow : ApplicationWindow
     [GtkChild] private Revealer notification_revealer;
     [GtkChild] private Label notification_label;
 
+    private ulong use_shortpaths_changed_handler = 0;
     private ulong behaviour_changed_handler = 0;
 
-    public DConfWindow (bool disable_warning, string? schema, string? path, string? key_name)
+    internal DConfWindow (bool disable_warning, string? schema, string? path, string? key_name)
     {
         install_action_entries ();
+
+        use_shortpaths_changed_handler = settings.changed ["use-shortpaths"].connect_after (reload_view);
+        settings.bind ("use-shortpaths", model, "use-shortpaths", SettingsBindFlags.GET|SettingsBindFlags.NO_SENSITIVITY);
 
         modifications_handler = new ModificationsHandler (model);
         revealer.modifications_handler = modifications_handler;
         browser_view.modifications_handler = modifications_handler;
 
-        behaviour_changed_handler = settings.changed ["behaviour"].connect_after (invalidate_popovers);
+        behaviour_changed_handler = settings.changed ["behaviour"].connect_after (invalidate_popovers_with_ui_reload);
         settings.bind ("behaviour", modifications_handler, "behaviour", SettingsBindFlags.GET|SettingsBindFlags.NO_SENSITIVITY);
 
         if (!disable_warning && settings.get_boolean ("show-warning"))
             show.connect (show_initial_warning);
 
-        set_default_size (settings.get_int ("window-width"), settings.get_int ("window-height"));
+        // maximize before setting default size: only one call to on_size_allocate() so no change of the large-window CSS class at start
         if (settings.get_boolean ("window-is-maximized"))
             maximize ();
+        set_default_size (settings.get_int ("window-width"), settings.get_int ("window-height"));
 
         set_css_styles ();
 
@@ -163,16 +168,13 @@ class DConfWindow : ApplicationWindow
         if (first_path == null)
             first_path = "/";
 
-        if (!SettingsModel.is_key_path ((!) first_path))
-            request_folder ((!) first_path);
-        else if (schema != null && model.path_exists ((!) first_path))
-            request_object ((!) first_path, (!) schema);
-        else if (model.path_exists ((!) first_path))
-            request_object ((!) first_path);
-        else if (model.path_exists ((!) first_path + "/"))
-            request_folder ((!) first_path + "/");
+        string startup_path = model.get_startup_path_fallback ((!) first_path);
+        if (ModelUtils.is_folder_path (startup_path))
+            request_folder (startup_path);
+        else if (schema != null)
+            request_object (startup_path, ModelUtils.undefined_context_id, true, (!) schema);
         else
-            request_object ((!) first_path);
+            request_object (startup_path, ModelUtils.undefined_context_id, true);
     }
 
     private void prepare_model ()
@@ -207,17 +209,31 @@ class DConfWindow : ApplicationWindow
         settings.bind ("refresh-settings-schema-source", model, "refresh-source", SettingsBindFlags.GET|SettingsBindFlags.NO_SENSITIVITY);
         model.finalize_model ();
 
-        model.paths_changed.connect ((_model, modified_path_specs, internal_changes) => {
-                if (current_type == ViewType.SEARCH)
-                {
-                    if (!internal_changes)
-                        reload_search_action.set_enabled (true);
-                }
-                else if (browser_view.check_reload (current_type, current_path, !internal_changes))    // handle infobars in needed
-                    reload_view ();
+        model.paths_changed.connect (on_paths_changed);
+        model.gkey_value_push.connect (propagate_gkey_value_push);
+        model.dkey_value_push.connect (propagate_dkey_value_push);
+    }
+    private void on_paths_changed (SettingsModelCore _model, GenericSet<string> unused, bool internal_changes)
+    {
+        if (current_type == ViewType.SEARCH)
+        {
+            if (!internal_changes)  // TODO do not react to value changes
+                reload_search_action.set_enabled (true);
+        }
+        else if (browser_view.check_reload (current_type, current_path, !internal_changes))    // handle infobars in needed
+            reload_view ();
 
-                pathbar.update_ghosts (_model.get_fallback_path (pathbar.complete_path), search_bar.search_mode_enabled);
-            });
+        pathbar.update_ghosts (((SettingsModel) _model).get_fallback_path (pathbar.complete_path), search_bar.search_mode_enabled);
+    }
+    private void propagate_gkey_value_push (string full_name, uint16 context, Variant key_value, bool is_key_default)
+    {
+        browser_view.gkey_value_push (full_name, context, key_value, is_key_default);
+        revealer.gkey_value_push     (full_name, context, key_value, is_key_default);
+    }
+    private void propagate_dkey_value_push (string full_name, Variant? key_value_or_null)
+    {
+        browser_view.dkey_value_push (full_name, key_value_or_null);
+        revealer.dkey_value_push     (full_name, key_value_or_null);
     }
 
     /*\
@@ -343,13 +359,16 @@ class DConfWindow : ApplicationWindow
         ((ConfigurationEditor) get_application ()).clean_copy_notification ();
 
         settings.disconnect (behaviour_changed_handler);
+        settings.disconnect (use_shortpaths_changed_handler);
         settings.disconnect (small_keys_list_rows_handler);
         settings.disconnect (small_bookmarks_rows_handler);
 
         settings.delay ();
         settings.set_string ("saved-view", saved_view);
-        settings.set_int ("window-width", window_width);
-        settings.set_int ("window-height", window_height);
+        if (window_width <= 630)    settings.set_int ("window-width", 630);
+        else                        settings.set_int ("window-width", window_width);
+        if (window_height <= 420)   settings.set_int ("window-height", 420);
+        else                        settings.set_int ("window-height", window_height);
         settings.set_boolean ("window-is-maximized", window_is_maximized);
         settings.apply ();
 
@@ -378,10 +397,10 @@ class DConfWindow : ApplicationWindow
         { "empty", empty, "*" },
 
         { "notify-folder-emptied", notify_folder_emptied, "s" },
-        { "notify-object-deleted", notify_object_deleted, "(ss)" },
+        { "notify-object-deleted", notify_object_deleted, "(sq)" },
 
         { "open-folder", open_folder, "s" },
-        { "open-object", open_object, "(ss)" },
+        { "open-object", open_object, "(sq)" },
         { "open-parent", open_parent, "s" },
 
         { "reload-folder", reload_folder },
@@ -416,8 +435,8 @@ class DConfWindow : ApplicationWindow
         requires (path_variant != null)
     {
         string full_name;
-        string unused;  // GAction parameter type switch is a little touchy, see pathbar.vala
-        ((!) path_variant).@get ("(ss)", out full_name, out unused);
+        uint16 unused;  // GAction parameter type switch is a little touchy, see pathbar.vala
+        ((!) path_variant).@get ("(sq)", out full_name, out unused);
 
         show_notification (_("Key “%s” has been deleted.").printf (full_name));
     }
@@ -441,17 +460,17 @@ class DConfWindow : ApplicationWindow
         revealer.hide_modifications_list ();
 
         string full_name;
-        string context;
-        ((!) path_variant).@get ("(ss)", out full_name, out context);
+        uint16 context_id;
+        ((!) path_variant).@get ("(sq)", out full_name, out context_id);
 
-        request_object (full_name, context);
+        request_object (full_name, context_id);
     }
 
     private void open_parent (SimpleAction action, Variant? path_variant)
         requires (path_variant != null)
     {
         string full_name = ((!) path_variant).get_string ();
-        request_folder (SettingsModel.get_parent_path (full_name), full_name);
+        request_folder (ModelUtils.get_parent_path (full_name), full_name);
     }
 
     private void reload_folder (/* SimpleAction action, Variant? path_variant */)
@@ -461,7 +480,7 @@ class DConfWindow : ApplicationWindow
 
     private void reload_object (/* SimpleAction action, Variant? path_variant */)
     {
-        request_object (current_path, "", false);
+        request_object (current_path, ModelUtils.undefined_context_id, false);
     }
 
     private void reload_search (/* SimpleAction action, Variant? path_variant */)
@@ -484,25 +503,25 @@ class DConfWindow : ApplicationWindow
     private void reset_path (string path, bool recursively)
     {
         enter_delay_mode ();
-        revealer.reset_objects (model.get_children (path), recursively);
+        revealer.reset_objects (path, model.get_children (path), recursively);
     }
 
     private void enter_delay_mode (/* SimpleAction action, Variant? path_variant */)
     {
         modifications_handler.enter_delay_mode ();
-        invalidate_popovers ();
+        invalidate_popovers_with_ui_reload ();
     }
 
     private void apply_delayed_settings (/* SimpleAction action, Variant? path_variant */)
     {
         modifications_handler.apply_delayed_settings ();
-        invalidate_popovers ();
+        invalidate_popovers_with_ui_reload ();
     }
 
     private void dismiss_delayed_settings (/* SimpleAction action, Variant? path_variant */)
     {
         modifications_handler.dismiss_delayed_settings ();
-        invalidate_popovers ();
+        invalidate_popovers_with_ui_reload ();
     }
 
     private void dismiss_change (SimpleAction action, Variant? path_variant)
@@ -517,7 +536,7 @@ class DConfWindow : ApplicationWindow
         requires (path_variant != null)
     {
         modifications_handler.erase_dconf_key (((!) path_variant).get_string ());
-        invalidate_popovers ();
+        invalidate_popovers_with_ui_reload ();
     }
 
     private void copy_path (/* SimpleAction action, Variant? path_variant */)
@@ -526,12 +545,16 @@ class DConfWindow : ApplicationWindow
 
         if (search_bar.search_mode_enabled)
         {
-            model.copy_action = true;
+            model.copy_action_called ();
             string selected_row_text = browser_view.get_copy_path_text () ?? saved_view;
             ((ConfigurationEditor) get_application ()).copy (selected_row_text);
         }
         else
+        {
+            if (browser_view.current_view == ViewType.OBJECT)
+                model.copy_action_called ();
             ((ConfigurationEditor) get_application ()).copy (current_path);
+        }
     }
 
     private void hide_notification (/* SimpleAction action, Variant? variant */)
@@ -550,42 +573,56 @@ class DConfWindow : ApplicationWindow
         if (notify_missing && (fallback_path != full_name))
             cannot_find_folder (full_name); // do not place after, full_name is in some cases changed by set_directory()...
 
-        GLib.ListStore? key_model = model.get_children (fallback_path);
-        if (key_model != null)
-        {
-            browser_view.prepare_folder_view ((!) key_model, current_path.has_prefix (fallback_path));
-            update_current_path (ViewType.FOLDER, fallback_path);
+        browser_view.prepare_folder_view (create_key_model (fallback_path, model.get_children (fallback_path, true, true)), current_path.has_prefix (fallback_path));
+        update_current_path (ViewType.FOLDER, fallback_path);
 
-            if (selected_or_empty == "")
-                browser_view.select_row (pathbar.get_selected_child (fallback_path));
-            else
-                browser_view.select_row (selected_or_empty);
-        }
+        if (selected_or_empty == "")
+            browser_view.select_row (pathbar.get_selected_child (fallback_path));
+        else
+            browser_view.select_row (selected_or_empty);
 
         search_bar.search_mode_enabled = false; // do last to avoid flickering RegistryView before PropertiesView when selecting a search result
     }
-
-    private void request_object (string full_name, string context = "", bool notify_missing = true)
+    private static GLib.ListStore create_key_model (string base_path, Variant? children)
     {
-        Key? found_object = model.get_key (full_name, context);
-        if (found_object == null)   // TODO warn about missing context
-            found_object = model.get_key (full_name, "");
+        GLib.ListStore key_model = new GLib.ListStore (typeof (SimpleSettingObject));
+        if (children != null)
+        {
+            VariantIter iter = new VariantIter ((!) children);
+            uint16 context_id;
+            string name;
+            while (iter.next ("(qs)", out context_id, out name))
+            {
+                if (ModelUtils.is_undefined_context_id (context_id))
+                    assert_not_reached ();
+                SimpleSettingObject sso = new SimpleSettingObject.from_base_path (context_id, name, base_path);
+                ((!) key_model).append (sso);
+            }
+        }
+        return key_model;
+    }
 
-        if (found_object == null)
+    private void request_object (string full_name, uint16 context_id = ModelUtils.undefined_context_id, bool notify_missing = true, string schema_id = "")
+    {
+        context_id = model.get_fallback_context (full_name, context_id, schema_id);
+
+        if (ModelUtils.is_undefined_context_id (context_id))
         {
             if (notify_missing)
             {
-                if (SettingsModel.is_key_path (full_name))
+                if (ModelUtils.is_key_path (full_name))
                     cannot_find_key (full_name);
                 else
                     cannot_find_folder (full_name);
             }
-            request_folder (SettingsModel.get_parent_path (full_name), full_name, false);
+            request_folder (ModelUtils.get_parent_path (full_name), full_name, false);
             pathbar.update_ghosts (model.get_fallback_path (pathbar.complete_path), false);
         }
         else
         {
-            browser_view.prepare_object_view ((!) found_object, current_path == SettingsModel.get_parent_path (full_name));
+            browser_view.prepare_object_view (full_name, context_id,
+                                              model.get_key_properties (full_name, context_id, 0),
+                                              current_path == ModelUtils.get_parent_path (full_name));
             update_current_path (ViewType.OBJECT, strdup (full_name));
         }
 
@@ -612,7 +649,7 @@ class DConfWindow : ApplicationWindow
         if (browser_view.current_view == ViewType.FOLDER)
             request_folder (current_path, browser_view.get_selected_row_name ());
         else if (browser_view.current_view == ViewType.OBJECT)
-            request_object (current_path, "", false);
+            request_object (current_path, ModelUtils.undefined_context_id, false);
         else if (browser_view.current_view == ViewType.SEARCH)
             request_search (true);
     }
@@ -653,7 +690,7 @@ class DConfWindow : ApplicationWindow
 
         if (current_type == ViewType.OBJECT)   // mainly here for ensuring menu is never empty
         {
-            Variant variant = new Variant.string (model.get_key_copy_text (current_path, browser_view.last_context));
+            Variant variant = new Variant.string (model.get_suggested_key_copy_text (current_path, browser_view.last_context_id));
             menu.append (_("Copy descriptor"), "app.copy(" + variant.print (false) + ")");
         }
         else
@@ -678,10 +715,10 @@ class DConfWindow : ApplicationWindow
         info_button.set_menu_model ((MenuModel) menu);
     }
 
-    private void invalidate_popovers ()
+    private void invalidate_popovers_with_ui_reload ()
     {
+        browser_view.hide_or_show_toggles (!modifications_handler.get_current_delay_mode ());
         invalidate_popovers_without_reload ();
-        reload_view ();     // TODO better
     }
     private void invalidate_popovers_without_reload ()
     {
@@ -757,7 +794,7 @@ class DConfWindow : ApplicationWindow
         Widget? focus = get_focus ();
         bool focus_is_text_widget = focus != null && (((!) focus is Entry) || ((!) focus is TextView));
         if (!focus_is_text_widget)
-            if (name != "F10")                         // else <Shift>F10 toggles the search_entry popup
+            if (name != "F10") // else <Shift>F10 toggles the search_entry popup; see if a976aa9740 fixes that in Gtk+ 4
                 if (search_bar.handle_event (event))
                     return true;
 
@@ -774,8 +811,8 @@ class DConfWindow : ApplicationWindow
                     return true;
 
                 case "c":
-                    if (search_bar.search_mode_enabled)
-                        model.copy_action = true;
+                    if (browser_view.current_view != ViewType.FOLDER)
+                        model.copy_action_called ();
                     else if (focus_is_text_widget)
                         return false;
 
@@ -783,7 +820,7 @@ class DConfWindow : ApplicationWindow
 
                     string? selected_row_text = browser_view.get_copy_text ();
                     if (selected_row_text == null && current_type == ViewType.OBJECT)
-                        selected_row_text = model.get_key_copy_text (current_path, browser_view.last_context);
+                        selected_row_text = model.get_suggested_key_copy_text (current_path, browser_view.last_context_id);
                     ConfigurationEditor application = (ConfigurationEditor) get_application ();
                     application.copy (selected_row_text == null ? current_path : (!) selected_row_text);
                     return true;
@@ -913,7 +950,7 @@ class DConfWindow : ApplicationWindow
 
         if (name == "Menu")
         {
-            if (browser_view.show_row_popover ())
+            if (browser_view.toggle_row_popover ())
             {
                 if (bookmarks_button.active)
                     bookmarks_button.active = false;
@@ -951,7 +988,7 @@ class DConfWindow : ApplicationWindow
         if (shift)
             request_folder ("/");
         else
-            request_folder (SettingsModel.get_parent_path (current_path), current_path.dup ());
+            request_folder (ModelUtils.get_parent_path (current_path), current_path.dup ());
     }
     private void go_forward (bool shift)
     {
@@ -961,25 +998,29 @@ class DConfWindow : ApplicationWindow
         string complete_path = pathbar.complete_path;
 
         browser_view.discard_row_popover ();
-        if (current_path == complete_path)
+        if (current_path == complete_path)  // TODO something?
             return;
 
         if (shift)
         {
-            if (SettingsModel.is_key_path (complete_path))
+            string fallback_path = model.get_fallback_path (complete_path);
+            if (ModelUtils.is_key_path (fallback_path))
+                request_object (fallback_path);
+            else if (fallback_path != current_path)
+                request_folder (fallback_path);
+            else
+                request_folder (complete_path);
+        }
+        else
+        {
+            int index_of_last_slash = complete_path.index_of ("/", ((!) current_path).length);
+            if (index_of_last_slash != -1)
+                request_folder (complete_path.slice (0, index_of_last_slash + 1));
+            else if (ModelUtils.is_key_path (complete_path))
                 request_object (complete_path);
             else
                 request_folder (complete_path);
-            return;
         }
-
-        int index_of_last_slash = complete_path.index_of ("/", ((!) current_path).length);
-        if (index_of_last_slash != -1)
-            request_folder (complete_path.slice (0, index_of_last_slash + 1));
-        else if (SettingsModel.is_key_path (complete_path))
-            request_object (complete_path);
-        else
-            request_folder (complete_path);
     }
 
     /*\

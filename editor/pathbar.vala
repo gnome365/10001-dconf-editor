@@ -18,11 +18,11 @@
 using Gtk;
 
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/pathbar.ui")]
-public class PathBar : Box
+private class PathBar : Box
 {
     [GtkChild] private PathBarItem root_button;
 
-    public string complete_path { get; private set; default = ""; }
+    internal string complete_path { get; private set; default = ""; }
 
     construct
     {
@@ -33,7 +33,7 @@ public class PathBar : Box
     * * public calls
     \*/
 
-    public void set_path (ViewType type, string path)
+    internal void set_path (ViewType type, string path)
     {
         if (type == ViewType.SEARCH)
         {
@@ -113,7 +113,7 @@ public class PathBar : Box
         show_all ();
     }
 
-    public string get_selected_child (string current_path)
+    internal string get_selected_child (string current_path)
     {
         if (!complete_path.has_prefix (current_path) || complete_path == current_path)
             return "";
@@ -121,7 +121,7 @@ public class PathBar : Box
         return index_of_last_slash == -1 ? complete_path : complete_path.slice (0, index_of_last_slash + 1);
     }
 
-    public void update_ghosts (string non_ghost_path, bool is_search)
+    internal void update_ghosts (string non_ghost_path, bool is_search)
     {
         string action_target = "";
         @foreach ((child) => {
@@ -136,8 +136,8 @@ public class PathBar : Box
                         action_target = ((!) variant).get_string ();
                     else
                     {
-                        string unused;
-                        ((!) variant).get ("(ss)", out action_target, out unused);
+                        uint16 unused;
+                        ((!) variant).@get ("(sq)", out action_target, out unused);
                     }
 
                     if (context.has_class ("active"))
@@ -152,7 +152,10 @@ public class PathBar : Box
                             item.set_cursor_type (PathBarItem.CursorType.CONTEXT);
                             item.set_action_name ("ui.empty");
                         }
-                        context.remove_class ("inexistent");
+                        if (non_ghost_path.has_prefix (action_target))
+                            context.remove_class ("inexistent");
+                        else
+                            context.add_class ("inexistent");
                     }
                     else if (non_ghost_path.has_prefix (action_target))
                     {
@@ -221,8 +224,8 @@ public class PathBar : Box
         }
         else
         {
-            Variant variant = new Variant ("(ss)", complete_path, "");
-            string _variant = variant.print (false);
+            Variant variant = new Variant ("(sq)", complete_path, ModelUtils.undefined_context_id);
+            string _variant = variant.print (true);
             path_bar_item = new PathBarItem (label, "ui.open-object(" + _variant + ")", "ui.notify-object-deleted(" + _variant + ")");
         }
         add (path_bar_item);
@@ -252,12 +255,12 @@ public class PathBar : Box
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/pathbar-item.ui")]
 private class PathBarItem : Button
 {
-    public string alternative_action { get; construct; }
-    public string default_action { get; construct; }
-    public string text_string { get; construct; }
+    public string alternative_action { internal get; internal construct; }
+    public string default_action     { internal get; internal construct; }
+    public string text_string        { internal get; internal construct; }
     [GtkChild] private Label text_label;
 
-    public enum CursorType {
+    internal enum CursorType {
         DEFAULT,
         POINTER,
         CONTEXT
@@ -272,7 +275,7 @@ private class PathBarItem : Button
         leave_notify_event.connect (() => { hover = false; set_new_cursor_type (CursorType.DEFAULT); });
     }
 
-    public void set_cursor_type (CursorType cursor_type)
+    internal void set_cursor_type (CursorType cursor_type)
     {
         this.cursor_type = cursor_type;
         if (hover)
@@ -299,7 +302,7 @@ private class PathBarItem : Button
     [GtkCallback]
     private void update_cursor ()
     {
-        if (get_style_context ().has_class ("inexistent"))
+        if (get_style_context ().has_class ("inexistent") && !get_style_context ().has_class ("active"))
             return;
 
         if (cursor_type != CursorType.CONTEXT)
@@ -317,7 +320,7 @@ private class PathBarItem : Button
         popover_test.popup ();
     }
 
-    public PathBarItem (string label, string _default_action, string _alternative_action)
+    internal PathBarItem (string label, string _default_action, string _alternative_action)
     {
         Object (text_string: label, default_action: _default_action, alternative_action: _alternative_action);
         text_label.set_text (label);

@@ -110,6 +110,8 @@
                       <object class="GtkButton" id="erase_button">
                         <property name="visible">True</property>
                         <property name="label" translatable="yes">Erase key</property>
+                        <property name="action-name">bro.delay-erase</property>
+                        <property name="action-target">''</property>
                       </object>
                     </child>
                   </object>
@@ -157,6 +159,16 @@
                         <property name="max-width-chars">40</property>
                         <property name="wrap">True</property>
                         <property name="label" translatable="yes">This integer key can only take one value. That’s probably an error of the application that installed this schema. If possible, please open a bug about it.</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="one_choice_tuple_warning">
+                        <property name="visible">True</property>
+                        <property name="hexpand">True</property>
+                        <property name="xalign">0.5</property>
+                        <property name="max-width-chars">40</property>
+                        <property name="wrap">True</property>
+                        <property name="label" translatable="yes">This key has a special “empty tuple” type. That’s probably an error of the application that installed this schema. If possible, please open a bug about it.</property>
                       </object>
                     </child>
                   </object>
