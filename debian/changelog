@@ -1,8 +1,11 @@
-dconf-editor (3.30.0-1) UNRELEASED; urgency=medium
+dconf-editor (3.30.0-1) unstable; urgency=medium
 
   * New upstream release
+  * Add X-Ubuntu-Use-Langpack to opt in to Ubuntu language pack handling
+    (LP: #1779574)
+  * Bump Standards-Version to 4.2.1
 
- -- Jeremy Bicha <jbicha@debian.org>  Tue, 04 Sep 2018 11:13:15 -0400
+ -- Jeremy Bicha <jbicha@debian.org>  Tue, 04 Sep 2018 11:17:18 -0400
 
 dconf-editor (3.28.0-1) unstable; urgency=medium
 
