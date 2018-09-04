@@ -18,7 +18,7 @@
 using Gtk;
 
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/bookmarks.ui")]
-public class Bookmarks : MenuButton
+private class Bookmarks : MenuButton
 {
     [GtkChild] private ListBox bookmarks_list_box;
     [GtkChild] private Popover bookmarks_popover;
@@ -29,7 +29,7 @@ public class Bookmarks : MenuButton
     private string current_path = "/";
 
     private string schema_id = "ca.desrt.dconf-editor.Bookmarks";   // TODO move in a library
-    public string schema_path { private get; construct; }
+    public string schema_path { private get; internal construct; }
     private GLib.Settings settings;
 
     construct
@@ -38,13 +38,10 @@ public class Bookmarks : MenuButton
 
         settings = new GLib.Settings.with_path (schema_id, schema_path);
 
-        ulong bookmarks_changed_handler = settings.changed ["bookmarks"].connect (() => {
-                update_bookmarks ();
-                update_icon_and_switch ();
-            });
+        ulong bookmarks_changed_handler = settings.changed ["bookmarks"].connect (on_bookmarks_changed);
 
         update_bookmarks ();
-        ulong clicked_handler = clicked.connect (() => bookmarked_switch.grab_focus ());
+        ulong clicked_handler = clicked.connect (() => { if (active) bookmarked_switch.grab_focus (); });
 
         destroy.connect (() => {
                 settings.disconnect (bookmarks_changed_handler);
@@ -52,11 +49,17 @@ public class Bookmarks : MenuButton
             });
     }
 
+    private void on_bookmarks_changed ()
+    {
+        update_bookmarks ();
+        update_icon_and_switch ();
+    }
+
     /*\
     * * Public calls
     \*/
 
-    public void set_path (ViewType type, string path)
+    internal void set_path (ViewType type, string path)
     {
         if (type == ViewType.SEARCH)
             return;
@@ -67,13 +70,21 @@ public class Bookmarks : MenuButton
     }
 
     // for search
-    public string [] get_bookmarks ()
+    internal string [] get_bookmarks ()
     {
-        return settings.get_strv ("bookmarks");
+        string [] all_bookmarks = settings.get_strv ("bookmarks");
+        string [] unduplicated_bookmarks = {};
+        foreach (string bookmark in all_bookmarks)
+        {
+            if (bookmark in unduplicated_bookmarks)
+                continue;
+            unduplicated_bookmarks += bookmark;
+        }
+        return unduplicated_bookmarks;
     }
 
     // keyboard call
-    public void set_bookmarked (string path, bool new_state)
+    internal void set_bookmarked (string path, bool new_state)
     {
         if (path == current_path && bookmarked_switch.get_active () == new_state)
             return;
@@ -104,12 +115,16 @@ public class Bookmarks : MenuButton
     private void bookmark (SimpleAction action, Variant? path_variant)
         requires (path_variant != null)
     {
+        bookmarks_popover.closed ();    // if the popover is visible, the size of the listbox could change 1/2
+
         append_bookmark (((!) path_variant).get_string ());
     }
 
     private void unbookmark (SimpleAction action, Variant? path_variant)
         requires (path_variant != null)
     {
+        bookmarks_popover.closed ();    // if the popover is visible, the size of the listbox could change 2/2
+
         remove_bookmark (((!) path_variant).get_string ());
     }
 
@@ -156,10 +171,10 @@ public class Bookmarks : MenuButton
             unduplicated_bookmarks += bookmark;
 
             Bookmark bookmark_row = new Bookmark (bookmark);
-            if (SettingsModel.is_key_path (bookmark))
+            if (ModelUtils.is_key_path (bookmark))
             {
-                Variant variant = new Variant ("(ss)", bookmark, "");
-                bookmark_row.set_detailed_action_name ("ui.open-object(" + variant.print (false) + ")");    // TODO save context
+                Variant variant = new Variant ("(sq)", bookmark, ModelUtils.undefined_context_id);
+                bookmark_row.set_detailed_action_name ("ui.open-object(" + variant.print (true) + ")");    // TODO save context
             }
             else
             {
@@ -176,8 +191,6 @@ public class Bookmarks : MenuButton
 
     private void append_bookmark (string path)
     {
-        bookmarks_popover.closed ();    // if the popover is visible, the size of the listbox could change 1/2
-
         string [] bookmarks = settings.get_strv ("bookmarks");
         if (!(path in bookmarks))
         {
@@ -188,8 +201,6 @@ public class Bookmarks : MenuButton
 
     private void remove_bookmark (string bookmark_name)
     {
-        bookmarks_popover.closed ();    // if the popover is visible, the size of the listbox could change 2/2
-
         string [] old_bookmarks = settings.get_strv ("bookmarks");
         if (!(bookmark_name in old_bookmarks))
             return;
@@ -207,7 +218,7 @@ private class Bookmark : ListBoxRow
     [GtkChild] private Label bookmark_label;
     [GtkChild] private Button destroy_button;
 
-    public Bookmark (string bookmark_name)
+    internal Bookmark (string bookmark_name)
     {
         bookmark_label.set_label (bookmark_name);
         Variant variant = new Variant.string (bookmark_name);

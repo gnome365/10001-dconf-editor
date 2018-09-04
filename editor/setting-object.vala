@@ -15,49 +15,48 @@
   along with Dconf Editor.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-public abstract class SettingObject : Object
+private abstract class SettingObject : Object
 {
-    public string name { get; construct; }
-    public string full_name { get; construct; }
+    public string name          { internal get; protected construct; }
+    public string full_name     { internal get; protected construct; }
+}
 
-    public string casefolded_name { get; private construct; }
-    public string parent_path { get; private construct; }
-    construct
+private class Directory : SettingObject
+{
+    internal Directory (string _full_name, string _name)
     {
-        casefolded_name = name.casefold ();
-
-        if (full_name.length < 2)
-            parent_path = "/";
-        else
-        {
-            string tmp_string = full_name.slice (0, full_name.last_index_of_char ('/'));
-
-            if (full_name.has_suffix ("/"))
-                parent_path = full_name.slice (0, tmp_string.last_index_of_char ('/') + 1);
-            else
-                parent_path = tmp_string + "/";
-        }
+        Object (full_name: _full_name, name: _name);
     }
 }
 
-public class Directory : SettingObject
+private abstract class Key : SettingObject
 {
-    public Directory (string full_name, string name)
+    internal string type_string { get; protected set; default = "*"; }
+
+    internal uint key_hash { internal get; private set; default = 0; }
+    internal Variant? all_fixed_properties { internal get; private set; default = null; }
+    internal static void generate_key_fixed_properties (Key key)
+        requires (key.key_hash == 0)
+        requires (key.all_fixed_properties == null)
     {
-        Object (full_name: full_name, name: name);
+        RegistryVariantDict variantdict = new RegistryVariantDict ();
+        get_key_fixed_properties (key, 0, ref variantdict);
+        key.all_fixed_properties = variantdict.end ();
+        key.key_hash = ((!) key.all_fixed_properties).get_data_as_bytes ().hash ();
     }
-}
+    internal static void get_key_fixed_properties (Key key, PropertyQuery query, ref RegistryVariantDict variantdict)
+    {
+        if (key is DConfKey)
+            DConfKey._get_key_fixed_properties ((DConfKey) key, query, ref variantdict);
+        else if (key is GSettingsKey)
+            GSettingsKey._get_key_fixed_properties ((GSettingsKey) key, query, ref variantdict);
+        else assert_not_reached ();
+    }
 
-public abstract class Key : SettingObject
-{
-    public abstract string descriptor { owned get; }
+    internal signal void value_changed ();
+    internal ulong key_value_changed_handler = 0;
 
-    public string type_string { get; protected set; default = "*"; }
-    public Variant properties { owned get; protected set; }
-
-    public signal void value_changed ();
-
-    protected static string key_to_description (string type)
+    internal static string key_to_description (string type)   // TODO move in model-utils.vala
     {
         switch (type)
         {
@@ -90,6 +89,10 @@ public abstract class Key : SettingObject
             case "x":
             case "t":
                 return _("Integer");
+            case "v":
+                return _("Variant");
+            case "()":
+                return _("Empty tuple");
             default:
                 return type;
         }
@@ -156,8 +159,9 @@ public abstract class Key : SettingObject
         }
     }
 
-    public static string cool_text_value_from_variant (Variant variant, string type)        // called from subclasses and from KeyListBoxRow
+    internal static string cool_text_value_from_variant (Variant variant)        // called from subclasses and from KeyListBoxRow
     {
+        string type = variant.get_type_string ();
         switch (type)
         {
             case "b":
@@ -202,7 +206,7 @@ public abstract class Key : SettingObject
         return variant.print (false);
     }
 
-    public static string cool_boolean_text_value (bool? nullable_boolean, bool capitalized = true)
+    internal static string cool_boolean_text_value (bool? nullable_boolean, bool capitalized = true)
     {
         if (capitalized)
         {
@@ -223,12 +227,15 @@ public abstract class Key : SettingObject
         }
     }
 
-    protected static bool show_min_and_max (string type)
+    protected static bool show_min_and_max (string type_code)
     {
-        return (type == "d" || type == "y" || type == "n" || type == "q" || type == "i" || type == "u" || type == "x" || type == "t");
+        return (type_code == "d" || type_code == "y"    // double and unsigned 8 bits; not the handle type
+             || type_code == "i" || type_code == "u"    // signed and unsigned 32 bits
+             || type_code == "n" || type_code == "q"    // signed and unsigned 16 bits
+             || type_code == "x" || type_code == "t");  // signed and unsigned 64 bits
     }
 
-    public static uint64 get_variant_as_uint64 (Variant variant)
+    internal static uint64 get_variant_as_uint64 (Variant variant)
     {
         switch (variant.classify ())
         {
@@ -240,7 +247,7 @@ public abstract class Key : SettingObject
         }
     }
 
-    public static int64 get_variant_as_int64 (Variant variant)
+    internal static int64 get_variant_as_int64 (Variant variant)
     {
         switch (variant.classify ())
         {
@@ -253,34 +260,18 @@ public abstract class Key : SettingObject
     }
 }
 
-public class DConfKey : Key
+private class DConfKey : Key
 {
-    public override string descriptor { owned get { return full_name; } }
-
-    public DConfKey (DConf.Client client, string parent_full_name, string name, string type_string)
+    internal DConfKey (string full_name, string name, string type_string)
     {
-        Object (full_name: parent_full_name + name, name: name, type_string: type_string);
+        Object (full_name: full_name, name: name, type_string: type_string);
+    }
 
-        VariantBuilder builder = new VariantBuilder (new VariantType ("(ba{ss})"));     // TODO add VariantBuilder add_parsed () function in vala/glib-2.0.vapi line ~5490
-        builder.add ("b",    false);
-        builder.open (new VariantType ("a{ss}"));
-        builder.add ("{ss}", "key-name",    name);
-        builder.add ("{ss}", "defined-by",  _("DConf backend"));
-        builder.add ("{ss}", "parent-path", parent_full_name);
-        builder.add ("{ss}", "type-code",   type_string);
-        builder.add ("{ss}", "type-name",   key_to_description (type_string));
-        if (show_min_and_max (type_string))
-        {
-            string min, max;
-            get_min_and_max_string (out min, out max, type_string);
-
-            builder.add ("{ss}", "minimum", min);
-            builder.add ("{ss}", "maximum", max);
-        }
-        builder.close ();
-        properties = builder.end ();
-
-        client.changed.connect ((client, prefix, changes, tag) => {
+    private ulong client_changed_handler = 0;
+    internal void connect_client (DConf.Client client)
+        requires (client_changed_handler == 0)
+    {
+        client_changed_handler = client.changed.connect ((client, prefix, changes, tag) => {
                 foreach (string item in changes)
                     if (prefix + item == full_name)
                     {
@@ -289,32 +280,71 @@ public class DConfKey : Key
                     }
             });
     }
+    internal void disconnect_client (DConf.Client client)
+        requires (client_changed_handler != 0)
+    {
+        client.disconnect (client_changed_handler);
+        client_changed_handler = 0;
+    }
+
+    internal static void _get_key_fixed_properties (DConfKey dkey, PropertyQuery query, ref RegistryVariantDict variantdict)
+    {
+        bool all_properties_queried = query == 0;
+
+        if (all_properties_queried || PropertyQuery.HAS_SCHEMA      in query)
+            variantdict.insert_value (PropertyQuery.HAS_SCHEMA,                 new Variant.boolean (false));
+        if (all_properties_queried || PropertyQuery.KEY_NAME        in query)
+            variantdict.insert_value (PropertyQuery.KEY_NAME,                   new Variant.string (dkey.name));
+        if (all_properties_queried || PropertyQuery.TYPE_CODE       in query)
+            variantdict.insert_value (PropertyQuery.TYPE_CODE,                  new Variant.string (dkey.type_string));
+
+        if (show_min_and_max (dkey.type_string) && (all_properties_queried || PropertyQuery.MINIMUM in query || PropertyQuery.MAXIMUM in query))
+        {
+            string min, max;
+            get_min_and_max_string (out min, out max, dkey.type_string);
+
+            variantdict.insert_value (PropertyQuery.MINIMUM,                    new Variant.string (min));
+            variantdict.insert_value (PropertyQuery.MAXIMUM,                    new Variant.string (max));
+        }
+    }
 }
 
-public class GSettingsKey : Key
+private class GSettingsKey : Key
 {
-    public bool warning_conflicting_key = false;
-    public bool error_hard_conflicting_key = false;
+    internal KeyConflict key_conflict = KeyConflict.NONE;
 
-    public string schema_id              { get; construct; }
-    public string? schema_path   { private get; construct; }
-    public string summary                { get; construct; }
-    public string description    { private get; construct; }
-    public Variant default_value         { get; construct; }
-    public string range_type             { get; construct; }
-    public Variant range_content         { get; construct; }
+    public string? schema_path      { private get; internal construct; }
+    public string summary           { private get; internal construct; }
+    public string description       { private get; internal construct; }
+    public string schema_id        { internal get; internal construct; }
+    public Variant default_value   { internal get; internal construct; }
+    public RangeType range_type    { internal get; internal construct; }
+    public Variant range_content   { internal get; internal construct; }
 
-    public override string descriptor {
+    public GLib.Settings settings  { internal get; internal construct; }
+
+    internal string descriptor {
         owned get {
+            string parent_path;
+            if (full_name.length < 2)
+                parent_path = "/";
+            else
+            {
+                string tmp_string = full_name.slice (0, full_name.last_index_of_char ('/'));
+
+                if (full_name.has_suffix ("/"))
+                    parent_path = full_name.slice (0, tmp_string.last_index_of_char ('/') + 1);
+                else
+                    parent_path = tmp_string + "/";
+            }
+
             if (schema_path == null)
                 return @"$schema_id:$parent_path $name";
             return @"$schema_id $name";
         }
     }
 
-    public GLib.Settings settings { get; construct; }
-
-    public GSettingsKey (string parent_full_name, string name, GLib.Settings settings, string schema_id, string? schema_path, string summary, string description, string type_string, Variant default_value, string range_type, Variant range_content)
+    internal GSettingsKey (string parent_full_name, string name, GLib.Settings settings, string schema_id, string? schema_path, string summary, string description, string type_string, Variant default_value, RangeType range_type, Variant range_content)
     {
         string? summary_nullable = summary.locale_to_utf8 (-1, null, null, null);
         summary = summary_nullable ?? summary;
@@ -322,52 +352,82 @@ public class GSettingsKey : Key
         string? description_nullable = description.locale_to_utf8 (-1, null, null, null);
         description = description_nullable ?? description;
 
-        Object (full_name: parent_full_name + name,
+        Object (schema_id: schema_id,
+                full_name: parent_full_name + name,
                 name: name,
                 settings : settings,
                 // schema infos
-                schema_id: schema_id,
                 schema_path: schema_path,
                 summary: summary,
                 description: description,
+                type_string: type_string,
                 default_value: default_value,       // TODO devel default/admin default
                 range_type: range_type,
                 range_content: range_content);
+    }
 
-        settings.changed [name].connect (() => value_changed ());
+    private ulong settings_changed_handler = 0;
+    internal void connect_settings ()
+        requires (settings_changed_handler == 0)
+    {
+        settings_changed_handler = settings.changed [name].connect (() => value_changed ());
+    }
+    internal void disconnect_settings ()
+        requires (settings_changed_handler != 0)
+    {
+        settings.disconnect (settings_changed_handler);
+        settings_changed_handler = 0;
+    }
 
-        this.type_string = type_string;
+    internal static void _get_key_fixed_properties (GSettingsKey gkey, PropertyQuery query, ref RegistryVariantDict variantdict)
+    {
+        bool all_properties_queried = query == 0;
 
-        string defined_by = schema_path == null ? _("Relocatable schema") : _("Schema with path");
+        if (all_properties_queried || PropertyQuery.HAS_SCHEMA      in query)
+            variantdict.insert_value (PropertyQuery.HAS_SCHEMA,                 new Variant.boolean (true));
+        if (all_properties_queried || PropertyQuery.KEY_NAME        in query)
+            variantdict.insert_value (PropertyQuery.KEY_NAME,                   new Variant.string (gkey.name));
+        if (all_properties_queried || PropertyQuery.TYPE_CODE       in query)
+            variantdict.insert_value (PropertyQuery.TYPE_CODE,                  new Variant.string (gkey.type_string));
 
-        VariantBuilder builder = new VariantBuilder (new VariantType ("(ba{ss})"));
-        builder.add ("b",    true);
-        builder.open (new VariantType ("a{ss}"));
-        builder.add ("{ss}", "key-name",    name);
-        builder.add ("{ss}", "defined-by",  defined_by);
-        builder.add ("{ss}", "parent-path", parent_full_name);
-        builder.add ("{ss}", "type-code",   type_string);
-        builder.add ("{ss}", "type-name",   key_to_description (type_string));
-        builder.add ("{ss}", "schema-id",   schema_id);
-        builder.add ("{ss}", "summary",     summary);
-        builder.add ("{ss}", "description", description);
-        builder.add ("{ss}", "default-value", cool_text_value_from_variant (default_value, type_string));
-        if (show_min_and_max (type_string))
+        if (all_properties_queried || PropertyQuery.FIXED_SCHEMA    in query)
+            variantdict.insert_value (PropertyQuery.FIXED_SCHEMA,               new Variant.boolean (gkey.schema_path != null));
+        if (all_properties_queried || PropertyQuery.SUMMARY         in query)
+            variantdict.insert_value (PropertyQuery.SUMMARY,                    new Variant.string (gkey.summary));
+        if (all_properties_queried || PropertyQuery.DESCRIPTION     in query)
+            variantdict.insert_value (PropertyQuery.DESCRIPTION,                new Variant.string (gkey.description));
+        if (all_properties_queried || PropertyQuery.SCHEMA_ID       in query)
+            variantdict.insert_value (PropertyQuery.SCHEMA_ID,                  new Variant.string (gkey.schema_id));
+        if (all_properties_queried || PropertyQuery.DEFAULT_VALUE   in query)
+            variantdict.insert_value (PropertyQuery.DEFAULT_VALUE,              new Variant.string (cool_text_value_from_variant (gkey.default_value)));
+        if (all_properties_queried || PropertyQuery.RANGE_TYPE      in query)
+            variantdict.insert_value (PropertyQuery.RANGE_TYPE,                 new Variant.byte ((uint8) gkey.range_type));
+        if (all_properties_queried || PropertyQuery.RANGE_CONTENT   in query)
+            variantdict.insert_value (PropertyQuery.RANGE_CONTENT,              new Variant.variant (gkey.range_content));
+
+        if (show_min_and_max (gkey.type_string)
+         && (all_properties_queried || PropertyQuery.MINIMUM in query || PropertyQuery.MAXIMUM in query))
         {
             string min, max;
-            if (range_type == "range")     // TODO test more; and what happen if only min/max is in range?
+            if (gkey.range_type == RangeType.RANGE)     // TODO test more; and what happen if only min/max is in range?
             {
-                min = cool_text_value_from_variant (range_content.get_child_value (0), type_string);
-                max = cool_text_value_from_variant (range_content.get_child_value (1), type_string);
+                min = cool_text_value_from_variant (gkey.range_content.get_child_value (0));
+                max = cool_text_value_from_variant (gkey.range_content.get_child_value (1));
             }
             else
-                get_min_and_max_string (out min, out max, type_string);
+                get_min_and_max_string (out min, out max, gkey.type_string);
 
-            builder.add ("{ss}", "minimum", min);
-            builder.add ("{ss}", "maximum", max);
+            variantdict.insert_value (PropertyQuery.MINIMUM,                    new Variant.string (min));
+            variantdict.insert_value (PropertyQuery.MAXIMUM,                    new Variant.string (max));
         }
-        builder.close ();
-        properties = builder.end ();
     }
 }
 
+private string get_defined_by (bool has_schema, bool fixed_schema = false)
+{
+    if (fixed_schema)
+        return _("Schema with path");
+    if (has_schema)
+        return _("Relocatable schema");
+    return _("DConf backend");
+}

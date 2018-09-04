@@ -17,33 +17,33 @@
 
 using Gtk;
 
-public interface KeyEditorChild : Widget
+private interface KeyEditorChild : Widget
 {
-    public signal void value_has_changed (bool is_valid = true);
+    internal signal void value_has_changed (bool is_valid = true);
 
-    public abstract Variant get_variant ();
-    public signal void child_activated ();
+    internal abstract Variant get_variant ();
+    internal signal void child_activated ();
 
-    public abstract void reload (Variant gvariant);
+    internal abstract void reload (Variant gvariant);
 }
 
 private class KeyEditorChildSingle : Label, KeyEditorChild
 {
     private Variant variant;
 
-    public KeyEditorChildSingle (Variant key_value, string text)
+    internal KeyEditorChildSingle (Variant key_value, string text)
     {
         variant = key_value;
         set_label (text);
         show ();
     }
 
-    public Variant get_variant ()
+    internal Variant get_variant ()
     {
         return variant;
     }
 
-    public void reload (Variant gvariant) {}
+    internal void reload (Variant gvariant) {}
 }
 
 private class KeyEditorChildEnum : MenuButton, KeyEditorChild
@@ -51,7 +51,7 @@ private class KeyEditorChildEnum : MenuButton, KeyEditorChild
     private Variant variant;
     private GLib.Action action;
 
-    public KeyEditorChildEnum (Variant initial_value, bool delay_mode, bool has_planned_change, Variant range_content)
+    internal KeyEditorChildEnum (Variant initial_value, bool delay_mode, bool has_planned_change, Variant range_content)
     {
         this.visible = true;
         this.hexpand = true;
@@ -60,27 +60,28 @@ private class KeyEditorChildEnum : MenuButton, KeyEditorChild
         this.width_request = 100;
 
         ContextPopover popover = new ContextPopover ();
-        action = popover.create_buttons_list (false, delay_mode, has_planned_change, "<enum>", initial_value, range_content);
+        action = popover.create_buttons_list (false, delay_mode, has_planned_change, "<enum>", range_content, initial_value);
         popover.set_relative_to (this);
 
-        popover.value_changed.connect ((gvariant) => {
-                if (gvariant == null)   // TODO better (1/3)
-                    assert_not_reached ();
-                reload ((!) gvariant);
-                popover.closed ();
-
-                value_has_changed ();
-            });
+        popover.value_changed.connect (on_popover_value_changed);
         reload (initial_value);
         this.set_popover ((Popover) popover);
     }
+    private void on_popover_value_changed (ContextPopover _popover, Variant? gvariant)
+        requires (gvariant != null)
+    {
+        reload ((!) gvariant);
+        _popover.closed ();
 
-    public Variant get_variant ()
+        value_has_changed ();
+    }
+
+    internal Variant get_variant ()
     {
         return variant;
     }
 
-    public void reload (Variant gvariant)
+    internal void reload (Variant gvariant)
     {
         variant = gvariant;
         VariantType type = gvariant.get_type ();
@@ -97,7 +98,7 @@ private class KeyEditorChildFlags : Grid, KeyEditorChild
     private Variant variant;
     private Label label = new Label ("");
 
-    public KeyEditorChildFlags (Variant initial_value, string [] _all_flags, string [] active_flags)
+    internal KeyEditorChildFlags (Variant initial_value, string [] _all_flags)
     {
         all_flags = _all_flags;
         this.visible = true;
@@ -117,30 +118,31 @@ private class KeyEditorChildFlags : Grid, KeyEditorChild
         label.hexpand = true;
         this.add (label);
 
-        popover.create_flags_list (active_flags, all_flags);
+        popover.create_flags_list (initial_value.get_strv (), all_flags);
         popover.set_relative_to (button);
-        popover.value_changed.connect ((gvariant) => {
-                if (gvariant == null)   // TODO better (2/3)
-                    assert_not_reached ();
-                reload ((!) gvariant);
-                value_has_changed ();
-            });
+        popover.value_changed.connect (on_popover_value_changed);
         reload (initial_value);
         button.set_popover ((Popover) popover);
     }
+    private void on_popover_value_changed (Popover _popover, Variant? gvariant)
+        requires (gvariant != null)
+    {
+        reload ((!) gvariant);
+        value_has_changed ();
+    }
 
-    public void update_flags (string [] active_flags)
+    internal void update_flags (string [] active_flags)
     {
         foreach (string flag in all_flags)
             popover.update_flag_status (flag, flag in active_flags);
     }
 
-    public Variant get_variant ()
+    internal Variant get_variant ()
     {
         return variant;
     }
 
-    public void reload (Variant gvariant)
+    internal void reload (Variant gvariant)
     {
         this.variant = gvariant;
         label.label = gvariant.print (false);
@@ -153,7 +155,7 @@ private class KeyEditorChildNullableBool : MenuButton, KeyEditorChild
     private Variant? maybe_variant;
     private GLib.Action action;
 
-    public KeyEditorChildNullableBool (Variant initial_value, bool delay_mode, bool has_planned_change, Variant? range_content_or_null)
+    internal KeyEditorChildNullableBool (Variant initial_value, bool delay_mode, bool has_planned_change, bool has_schema)
     {
         this.visible = true;
         this.hexpand = true;
@@ -161,28 +163,33 @@ private class KeyEditorChildNullableBool : MenuButton, KeyEditorChild
         this.use_popover = true;
         this.width_request = 100;
 
+        Variant? meaningless_variant_or_null = null;  // only used for adding or not "set to default"
+        if (has_schema)
+            meaningless_variant_or_null = new Variant.boolean (true);
+
         ContextPopover popover = new ContextPopover ();
-        action = popover.create_buttons_list (false, delay_mode, has_planned_change, "mb", initial_value, range_content_or_null);
+        action = popover.create_buttons_list (false, delay_mode, has_planned_change, "mb", meaningless_variant_or_null, initial_value);
         popover.set_relative_to (this);
 
-        popover.value_changed.connect ((gvariant) => {
-                if (gvariant == null)   // TODO better (3/3)
-                    assert_not_reached ();
-                reload ((!) gvariant);
-                popover.closed ();
-
-                value_has_changed ();
-            });
+        popover.value_changed.connect (on_popover_value_changed);
         reload (initial_value);
         this.set_popover ((Popover) popover);
     }
+    private void on_popover_value_changed (Popover _popover, Variant? gvariant)
+        requires (gvariant != null)
+    {
+        reload ((!) gvariant);
+        _popover.closed ();
 
-    public Variant get_variant ()
+        value_has_changed ();
+    }
+
+    internal Variant get_variant ()
     {
         return variant;
     }
 
-    public void reload (Variant gvariant)
+    internal void reload (Variant gvariant)
     {
         variant = gvariant;
         maybe_variant = variant.get_maybe ();
@@ -200,7 +207,7 @@ private class KeyEditorChildBool : Box, KeyEditorChild // might be managed by ac
 {
     private ToggleButton button_true;
 
-    public KeyEditorChildBool (bool initial_value)
+    internal KeyEditorChildBool (bool initial_value)
     {
         this.visible = true;
         this.hexpand = true;
@@ -226,40 +233,31 @@ private class KeyEditorChildBool : Box, KeyEditorChild // might be managed by ac
         button_true.toggled.connect (() => value_has_changed ());
     }
 
-    public Variant get_variant ()
+    internal Variant get_variant ()
     {
         return new Variant.boolean (button_true.active);
     }
 
-    public void reload (Variant gvariant)
+    internal void reload (Variant gvariant)
     {
         button_true.active = gvariant.get_boolean ();
     }
 }
 
-private class KeyEditorChildNumberDouble : Entry, KeyEditorChild
+private abstract class KeyEditorChildNumberCustom : Entry, KeyEditorChild
 {
-    private Variant variant;
+    protected Variant variant;
 
-    private ulong deleted_text_handler = 0;
-    private ulong inserted_text_handler = 0;
+    protected ulong deleted_text_handler = 0;
+    protected ulong inserted_text_handler = 0;
 
     construct
     {
         get_style_context ().add_class ("key-editor-child-entry");
     }
 
-    public KeyEditorChildNumberDouble (Variant initial_value)
+    protected void connect_entry ()
     {
-        this.variant = initial_value;
-
-        this.visible = true;
-        this.hexpand = true;
-        this.secondary_icon_activatable = false;
-        this.set_icon_tooltip_text (EntryIconPosition.SECONDARY, _("Failed to parse as double."));
-
-        this.text = initial_value.print (false);
-
         EntryBuffer ref_buffer = buffer;    // an EntryBuffer doesn't emit a "destroy" signal
         deleted_text_handler = ref_buffer.deleted_text.connect (() => value_has_changed (test_value ()));
         inserted_text_handler = ref_buffer.inserted_text.connect (() => value_has_changed (test_value ()));
@@ -272,33 +270,25 @@ private class KeyEditorChildNumberDouble : Entry, KeyEditorChild
             });
     }
 
-    private bool test_value ()
+    protected void show_error (bool show)
     {
-        string tmp_text = this.text; // don't put in the try{} for correct C code
-        try
+        StyleContext context = get_style_context ();
+        if (show)
         {
-            Variant? tmp_variant = Variant.parse (VariantType.DOUBLE, tmp_text);
-            variant = (!) tmp_variant;
-
-            StyleContext context = get_style_context ();
-            if (context.has_class ("error"))
-                context.remove_class ("error");
-            set_icon_from_icon_name (EntryIconPosition.SECONDARY, null);
-
-            return true;
-        }
-        catch (VariantParseError e)
-        {
-            StyleContext context = get_style_context ();
+            // TODO "error" style class should not be active/visible when the default-value toggle is activated (and the entry inactive)
             if (!context.has_class ("error"))
                 context.add_class ("error");
             secondary_icon_name = "dialog-error-symbolic";
-
-            return false;
+        }
+        else
+        {
+            if (context.has_class ("error"))
+                context.remove_class ("error");
+            set_icon_from_icon_name (EntryIconPosition.SECONDARY, null);
         }
     }
 
-    public Variant get_variant ()
+    internal Variant get_variant ()
     {
         return variant;
     }
@@ -318,13 +308,192 @@ private class KeyEditorChildNumberDouble : Entry, KeyEditorChild
         }
     }
 
-    public void reload (Variant gvariant)
+    internal void reload (Variant gvariant)
     {
         set_lock (true);
         this.text = gvariant.print (false);
         if (!test_value ())
             assert_not_reached ();
         set_lock (false);
+    }
+
+    protected abstract bool test_value ();
+}
+
+private class KeyEditorChildNumberDouble : KeyEditorChildNumberCustom
+{
+    private double min;
+    private double max;
+
+    internal KeyEditorChildNumberDouble (Variant initial_value, Variant? range_content_or_null)
+    {
+        this.variant = initial_value;
+
+        this.visible = true;
+        this.hexpand = true;
+        this.secondary_icon_activatable = false;
+        this.set_icon_tooltip_text (EntryIconPosition.SECONDARY, _("Failed to parse as double."));  // TODO change text for range
+
+        this.text = initial_value.print (false);
+
+        if (range_content_or_null != null)
+        {
+            min = ((!) range_content_or_null).get_child_value (0).get_double ();
+            max = ((!) range_content_or_null).get_child_value (1).get_double ();
+        }
+        else
+        {
+            min = double.MIN;
+            max = double.MAX;
+        }
+
+        connect_entry ();
+    }
+
+    protected override bool test_value ()
+    {
+        Variant? tmp_variant;
+        string tmp_text = this.text; // don't put in the try{} for correct C code
+        try
+        {
+            tmp_variant = Variant.parse (VariantType.DOUBLE, tmp_text);
+        }
+        catch (VariantParseError e)
+        {
+            show_error (true);
+            return false;
+        }
+
+        double variant_value = ((!) tmp_variant).get_double ();
+        if ((variant_value < min) || (variant_value > max))
+        {
+            show_error (true);
+            return false;
+        }
+        else
+        {
+            variant = (!) tmp_variant;
+            show_error (false);
+            return true;
+        }
+    }
+}
+
+private class KeyEditorChildNumberInt64 : KeyEditorChildNumberCustom
+{
+    private int64 min;
+    private int64 max;
+
+    internal KeyEditorChildNumberInt64 (Variant initial_value, Variant? range_content_or_null)
+    {
+        this.variant = initial_value;
+
+        this.visible = true;
+        this.hexpand = true;
+        this.secondary_icon_activatable = false;
+        this.set_icon_tooltip_text (EntryIconPosition.SECONDARY, _("This value is invalid for the key type.")); // TODO custom text, including range 1/2
+
+        this.text = initial_value.print (false);
+
+        if (range_content_or_null != null)
+        {
+            min = ((!) range_content_or_null).get_child_value (0).get_int64 ();
+            max = ((!) range_content_or_null).get_child_value (1).get_int64 ();
+        }
+        else
+        {
+            min = int64.MIN;
+            max = int64.MAX;
+        }
+
+        connect_entry ();
+    }
+
+    protected override bool test_value ()
+    {
+        Variant? tmp_variant;
+        string tmp_text = this.text; // don't put in the try{} for correct C code
+        try
+        {
+            tmp_variant = Variant.parse (VariantType.INT64, tmp_text);
+        }
+        catch (VariantParseError e)
+        {
+            show_error (true);
+            return false;
+        }
+
+        double variant_value = ((!) tmp_variant).get_int64 ();
+        if ((variant_value < min) || (variant_value > max))
+        {
+            show_error (true);
+            return false;
+        }
+        else
+        {
+            variant = (!) tmp_variant;
+            show_error (false);
+            return true;
+        }
+    }
+}
+
+private class KeyEditorChildNumberUint64 : KeyEditorChildNumberCustom
+{
+    private uint64 min;
+    private uint64 max;
+
+    internal KeyEditorChildNumberUint64 (Variant initial_value, Variant? range_content_or_null)
+    {
+        this.variant = initial_value;
+
+        this.visible = true;
+        this.hexpand = true;
+        this.secondary_icon_activatable = false;
+        this.set_icon_tooltip_text (EntryIconPosition.SECONDARY, _("This value is invalid for the key type.")); // TODO custom text, including range 2/2
+
+        this.text = initial_value.print (false);
+
+        if (range_content_or_null != null)
+        {
+            min = ((!) range_content_or_null).get_child_value (0).get_uint64 ();
+            max = ((!) range_content_or_null).get_child_value (1).get_uint64 ();
+        }
+        else
+        {
+            min = uint64.MIN;
+            max = uint64.MAX;
+        }
+
+        connect_entry ();
+    }
+
+    protected override bool test_value ()
+    {
+        Variant? tmp_variant;
+        string tmp_text = this.text; // don't put in the try{} for correct C code
+        try
+        {
+            tmp_variant = Variant.parse (VariantType.UINT64, tmp_text);
+        }
+        catch (VariantParseError e)
+        {
+            show_error (true);
+            return false;
+        }
+
+        double variant_value = ((!) tmp_variant).get_uint64 ();
+        if ((variant_value < min) || (variant_value > max))
+        {
+            show_error (true);
+            return false;
+        }
+        else
+        {
+            variant = (!) tmp_variant;
+            show_error (false);
+            return true;
+        }
     }
 }
 
@@ -335,7 +504,7 @@ private class KeyEditorChildNumberInt : SpinButton, KeyEditorChild
     private ulong deleted_text_handler = 0;
     private ulong inserted_text_handler = 0;
 
-    public KeyEditorChildNumberInt (Variant initial_value, string type_string, Variant? range_content_or_null)
+    internal KeyEditorChildNumberInt (Variant initial_value, string type_string, Variant? range_content_or_null)
         requires (type_string == "y" || type_string == "n" || type_string == "q" || type_string == "i" || type_string == "u" || type_string == "h")     // TODO type_string == "x" || type_string == "t" ||
     {
         this.key_type = type_string;
@@ -402,11 +571,11 @@ private class KeyEditorChildNumberInt : SpinButton, KeyEditorChild
         }
     }
 
-    public Variant get_variant ()   // TODO test_value against range
+    internal Variant get_variant ()   // TODO test_value against range
     {
         switch (key_type)
         {
-            case "y": return new Variant.byte   ((uchar)  get_int64_from_entry ()); // TODO uchar or uint8?
+            case "y": return new Variant.byte   ((uint8)  get_int64_from_entry ());
             case "n": return new Variant.int16  ((int16)  get_int64_from_entry ());
             case "q": return new Variant.uint16 ((uint16) get_int64_from_entry ());
             case "i": return new Variant.int32  ((int32)  get_int64_from_entry ());
@@ -435,7 +604,7 @@ private class KeyEditorChildNumberInt : SpinButton, KeyEditorChild
         }
     }
 
-    public void reload (Variant gvariant)       // TODO "key_editor_child_number_int_real_reload: assertion 'gvariant != NULL' failed" two times when ghosting a key
+    internal void reload (Variant gvariant)       // TODO "key_editor_child_number_int_real_reload: assertion 'gvariant != NULL' failed" two times when ghosting a key
     {
         set_lock (true);
         this.set_value (get_variant_as_double (gvariant));
@@ -458,7 +627,7 @@ private class KeyEditorChildArray : Grid, KeyEditorChild
         get_style_context ().add_class ("key-editor-child-array");
     }
 
-    public KeyEditorChildArray (string type_string, Variant initial_value)
+    internal KeyEditorChildArray (string type_string, Variant initial_value)
     {
         this.visible = true;
         this.hexpand = true;
@@ -477,20 +646,10 @@ private class KeyEditorChildArray : Grid, KeyEditorChild
         text_view.expand = true;
         text_view.wrap_mode = WrapMode.WORD;
         text_view.monospace = true;
-        text_view.key_press_event.connect ((event) => {
-                string keyval_name = (!) (Gdk.keyval_name (event.keyval) ?? "");
-                if ((keyval_name == "Return" || keyval_name == "KP_Enter")
-                && ((event.state & Gdk.ModifierType.MODIFIER_MASK) == 0)
-                && (test_value ()))
-                {
-                    child_activated ();
-                    return true;
-                }
-                return base.key_press_event (event);
-            });
+        text_view.key_press_event.connect (on_key_press_event);
         // https://bugzilla.gnome.org/show_bug.cgi?id=789676
-        text_view.button_press_event.connect_after (() => Gdk.EVENT_STOP);
-        text_view.button_release_event.connect_after (() => Gdk.EVENT_STOP);
+        text_view.button_press_event.connect_after (event_stop);
+        text_view.button_release_event.connect_after (event_stop);
 
         scrolled_window.add (text_view);
         add (scrolled_window);
@@ -523,6 +682,22 @@ private class KeyEditorChildArray : Grid, KeyEditorChild
                 ref_buffer.disconnect (inserted_text_handler);
             });
     }
+    private bool on_key_press_event (Gdk.EventKey event)
+    {
+        string keyval_name = (!) (Gdk.keyval_name (event.keyval) ?? "");
+        if ((keyval_name == "Return" || keyval_name == "KP_Enter")
+        && ((event.state & Gdk.ModifierType.MODIFIER_MASK) == 0)
+        && (test_value ()))
+        {
+            child_activated ();
+            return Gdk.EVENT_STOP;
+        }
+        return base.key_press_event (event);
+    }
+    private static bool event_stop ()
+    {
+        return Gdk.EVENT_STOP;
+    }
 
     private bool test_value ()
     {
@@ -550,7 +725,7 @@ private class KeyEditorChildArray : Grid, KeyEditorChild
         }
     }
 
-    public Variant get_variant ()
+    internal Variant get_variant ()
     {
         return variant;
     }
@@ -570,7 +745,7 @@ private class KeyEditorChildArray : Grid, KeyEditorChild
         }
     }
 
-    public void reload (Variant gvariant)
+    internal void reload (Variant gvariant)
     {
         set_lock (true);
         text_view.buffer.text = gvariant.print (false);
@@ -594,7 +769,7 @@ private class KeyEditorChildDefault : Entry, KeyEditorChild
         get_style_context ().add_class ("key-editor-child-entry");
     }
 
-    public KeyEditorChildDefault (string type_string, Variant initial_value)
+    internal KeyEditorChildDefault (string type_string, Variant initial_value)
     {
         this.key_type = type_string;
         this.variant = initial_value;
@@ -651,7 +826,7 @@ private class KeyEditorChildDefault : Entry, KeyEditorChild
         }
     }
 
-    public Variant get_variant ()
+    internal Variant get_variant ()
     {
         return variant;
     }
@@ -671,7 +846,7 @@ private class KeyEditorChildDefault : Entry, KeyEditorChild
         }
     }
 
-    public void reload (Variant gvariant)
+    internal void reload (Variant gvariant)
     {
         set_lock (true);
         this.text = is_string ? gvariant.get_string () : gvariant.print (false);
