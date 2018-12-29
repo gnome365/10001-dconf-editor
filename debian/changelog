@@ -1,3 +1,9 @@
+dconf-editor (3.30.2-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+
+ -- Jeremy Bicha <jbicha@debian.org>  Fri, 28 Dec 2018 20:17:10 -0500
+
 dconf-editor (3.30.0-2) unstable; urgency=medium
 
   * Build-Depend on libxml2-utils for xmllint
