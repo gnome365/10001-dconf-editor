@@ -1,8 +1,9 @@
-dconf-editor (3.30.2-1) UNRELEASED; urgency=medium
+dconf-editor (3.30.2-1) unstable; urgency=medium
 
   * New upstream release
+  * Build-Depend on debhelper-compat 12 and drop debian/compat
 
- -- Jeremy Bicha <jbicha@debian.org>  Fri, 28 Dec 2018 20:17:10 -0500
+ -- Jeremy Bicha <jbicha@debian.org>  Fri, 28 Dec 2018 20:19:59 -0500
 
 dconf-editor (3.30.0-2) unstable; urgency=medium
 
