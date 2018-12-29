@@ -34,6 +34,10 @@ private class ConfigurationEditor : Gtk.Application
                 "/org/gnome/desktop/app-folders/folders//"},
             {"org.gnome.desktop.notifications.application",
                 "/org/gnome/desktop/notifications/application//"},
+            {"org.gnome.libdevhelp-3.contents",
+                "/org/gnome/devhelp/state/main/contents/"},
+            {"org.gnome.libdevhelp-3.fonts",
+                "/org/gnome/devhelp/fonts/"},
             {"org.gnome.Epiphany.state",
                 "/org/gnome/epiphany/state/"},
             {"org.gnome.Epiphany.state",
@@ -123,7 +127,9 @@ private class ConfigurationEditor : Gtk.Application
             "org.gnome.settings-daemon.peripherals.wacom.tablet-button.deprecated",
             // TODO disable such schemas automatically?
             "com.gexperts.Tilix.SettingsList",
-            "org.gnome.Terminal.SettingsList"
+            "org.gnome.Terminal.SettingsList",
+            // TODO has no key, place here somehow automatically?
+            "org.gnome.libdevhelp-3"
         };
 
     private static bool disable_warning = false;
@@ -348,6 +354,9 @@ private class ConfigurationEditor : Gtk.Application
 
         if (arg0.has_prefix ("/"))
         {
+            if (arg0.contains ("//"))
+                return failure_double_slash (commands);
+
             Gtk.Window window = get_new_window (null, arg0, null);
             if (args.length == 2)
             {
@@ -389,11 +398,20 @@ private class ConfigurationEditor : Gtk.Application
                 simple_activation ();
                 return Posix.EXIT_FAILURE;
             }
+            if (((!) path).contains ("//"))
+                return failure_double_slash (commands);
         }
 
         Gtk.Window window = get_new_window (test_format [0], path, key_name);
         window.present ();
         return Posix.EXIT_SUCCESS;
+    }
+
+    private int failure_double_slash (ApplicationCommandLine commands)
+    {
+        commands.print ("Cannot understand: given path contains “//”.\n");  // should be translated, but nobody cares, so let's not lose time for a freeze break here
+        simple_activation ();
+        return Posix.EXIT_FAILURE;
     }
 
     private int failure_space (ApplicationCommandLine commands)
