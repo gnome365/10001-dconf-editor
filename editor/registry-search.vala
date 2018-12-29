@@ -147,7 +147,8 @@ private class RegistrySearch : RegistryList
     internal void start_search (string term)
         requires (current_path_if_search_mode != null)
     {
-        if (old_term != null && term == (!) old_term)
+        if ((old_term != null && term == (!) old_term)
+         || DConfWindow.is_path_invalid (term))
         {
             ensure_selection (key_list_box);
             return;
@@ -199,8 +200,10 @@ private class RegistrySearch : RegistryList
     {
         for (int i = post_local - 1; i >= 0; i--)
         {
-            SimpleSettingObject item = (SimpleSettingObject) list_model.get_item (i);
-            if (!(term in item.name))
+            SimpleSettingObject? item = (SimpleSettingObject?) list_model.get_item (i);
+            if (item == null)
+                assert_not_reached ();
+            if (!(term.casefold () in ((!) item).casefolded_name))
             {
                 post_local--;
                 post_bookmarks--;
@@ -214,8 +217,10 @@ private class RegistrySearch : RegistryList
     {
         for (int i = post_bookmarks - 1; i >= post_local; i--)
         {
-            SimpleSettingObject item = (SimpleSettingObject) list_model.get_item (i);
-            if (!(term in item.name))
+            SimpleSettingObject? item = (SimpleSettingObject?) list_model.get_item (i);
+            if (item == null)
+                assert_not_reached ();
+            if (!(term.casefold () in ((!) item).casefolded_name))
             {
                 post_bookmarks--;
                 post_folders--;
@@ -229,13 +234,13 @@ private class RegistrySearch : RegistryList
         for (int i = (int) list_model.get_n_items () - 1; i >= post_folders; i--)
         {
             SimpleSettingObject item = (SimpleSettingObject) list_model.get_item (i);
-            if (!(term in item.name))
+            if (!(term.casefold () in item.casefolded_name))
                 list_model.remove (i);
         }
         for (int i = post_folders - 1; i >= post_local; i--)
         {
             SimpleSettingObject item = (SimpleSettingObject) list_model.get_item (i);
-            if (!(term in item.name))
+            if (!(term.casefold () in item.casefolded_name))
             {
                 post_folders--;
                 list_model.remove (i);
@@ -257,7 +262,7 @@ private class RegistrySearch : RegistryList
             string name;
             while (iter.next ("(qs)", out context_id, out name))
             {
-                if (term in name)
+                if (term.casefold () in name.casefold ())
                 {
                     SimpleSettingObject sso = new SimpleSettingObject.from_base_path (context_id, name, current_path);
                     list_model.insert_sorted (sso, compare);
@@ -280,7 +285,7 @@ private class RegistrySearch : RegistryList
             if (!model.get_object (bookmark, out context_id, out name))
                 continue;
 
-            if (term in name)
+            if (term.casefold () in name.casefold ())
             {
                 post_bookmarks++;
                 post_folders++;
@@ -343,17 +348,17 @@ private class RegistrySearch : RegistryList
             if (ModelUtils.is_folder_context_id (context_id))
             {
                 string full_name = ModelUtils.recreate_full_name (next, name, true);
-                if (!local_again && !(full_name in bookmarks) && term in name)
+                if (!local_again && !(full_name in bookmarks) && term.casefold () in name.casefold ())
                 {
                     SimpleSettingObject sso = new SimpleSettingObject.from_full_name (context_id, name, full_name);
-                    list_model.insert (post_folders++, sso);
+                    list_model.insert (post_folders++, sso); // do not move the ++ outside
                 }
                 search_nodes.push_tail (full_name); // we still search local children
             }
             else
             {
                 string full_name = ModelUtils.recreate_full_name (next, name, false);
-                if (!local_again && !(full_name in bookmarks) && term in name)
+                if (!local_again && !(full_name in bookmarks) && term.casefold () in name.casefold ())
                 {
                     SimpleSettingObject sso = new SimpleSettingObject.from_base_path (context_id, name, next);
                     list_model.append (sso);

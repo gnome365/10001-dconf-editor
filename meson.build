@@ -1,6 +1,6 @@
 project(
   'dconf-editor', ['c', 'vala'],
-  version: '3.30.0',
+  version: '3.30.2',
   license: 'GPL3+',
   default_options: [
     'buildtype=debugoptimized',
@@ -26,7 +26,7 @@ dconf_editor_namespace = 'ca.desrt.dconf-editor'
 cc = meson.get_compiler('c')
 valac = meson.get_compiler('vala')
 
-vala_req_version = '>= 0.36.11'
+vala_req_version = '>= 0.40.0'
 
 assert(valac.version().version_compare(vala_req_version),
        'vala ' + vala_req_version + ' is required')
