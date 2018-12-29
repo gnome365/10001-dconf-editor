@@ -6,8 +6,8 @@ Source: dconf-editor
 Section: utils
 Priority: optional
 Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>
-Uploaders: Emilio Pozuelo Monfort <pochu@debian.org>, Jeremy Bicha <jbicha@debian.org>, Michael Biebl <biebl@debian.org>
-Build-Depends: debhelper (>= 11.1.3),
+Uploaders: Emilio Pozuelo Monfort <pochu@debian.org>, Jeremy Bicha <jbicha@debian.org>
+Build-Depends: debhelper-compat (= 12),
                gnome-pkg-tools (>= 0.10),
                meson (>= 0.41.0),
                appstream-util,
