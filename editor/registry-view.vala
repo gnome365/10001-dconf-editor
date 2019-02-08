@@ -19,10 +19,12 @@ using Gtk;
 
 private class RegistryView : RegistryList
 {
+    /* Translators: placeholder text of the keys list when there's nothing to display in a path (not used in current design) */
+    [CCode (notify = false)] public override string placeholder_label { protected get { return _("No keys in this path"); }}
+
     construct
     {
         search_mode = false;
-        placeholder.label = _("No keys in this path");
         key_list_box.set_header_func (update_row_header);
     }
 
@@ -90,9 +92,20 @@ private class RegistryView : RegistryList
 
     internal override void select_first_row ()
     {
-        ListBoxRow? row = key_list_box.get_row_at_index (0);
-        if (row != null)
-            scroll_to_row ((!) row, true);
+        uint n_items = list_model.get_n_items ();
+        if (n_items == 0)
+            assert_not_reached ();
+
+        ListBoxRow? row;
+        if (n_items == 2)
+            row = key_list_box.get_row_at_index (1);
+        else
+            row = key_list_box.get_row_at_index (0);
+
+        if (row == null)
+            assert_not_reached ();
+        key_list_box.select_row ((!) row);
+        ((!) row).grab_focus ();
     }
 
     /*\
@@ -101,33 +114,8 @@ private class RegistryView : RegistryList
 
     private void update_row_header (ListBoxRow row, ListBoxRow? before)
     {
-        _update_row_header (row, before, modifications_handler.model);
-    }
-    private static void _update_row_header (ListBoxRow row, ListBoxRow? before, SettingsModel model)
-    {
-        string? label_text = null;
-        if (row.get_child () is KeyListBoxRow)  // no header for folders
-        {
-            uint16 context_id = ((ClickableListBoxRow) row.get_child ()).context_id;
-            if (before == null || ((ClickableListBoxRow) ((!) before).get_child ()).context_id != context_id)
-            {
-                if (((KeyListBoxRow) row.get_child ()).has_schema)
-                {
-                    if (!model.key_exists (((KeyListBoxRow) ((!) row).get_child ()).full_name, context_id))
-                        return; // FIXME that happens when reloading a now-empty folder
-
-                    RegistryVariantDict properties = new RegistryVariantDict.from_aqv (model.get_key_properties (((KeyListBoxRow) row.get_child ()).full_name, context_id, (uint16) PropertyQuery.SCHEMA_ID));
-                    string schema_id;
-                    if (!properties.lookup (PropertyQuery.SCHEMA_ID, "s", out schema_id))
-                        assert_not_reached ();
-                    label_text = schema_id;
-                }
-                else
-                    label_text = _("Keys not defined by a schema");
-            }
-        }
-
-        ListBoxRowHeader header = new ListBoxRowHeader (before == null, label_text);
-        row.set_header (header);
+        if (is_first_row (row.get_index (), ref before))
+            return;
+        update_row_header_with_context (row, (!) before, modifications_handler.model, /* local search header */ false);
     }
 }

@@ -23,20 +23,32 @@ private class RegistryPlaceholder : Grid
     [GtkChild] private Label placeholder_label;
     [GtkChild] private Image placeholder_image;
 
-    public string label     { internal construct set { placeholder_label.label = value; }}
-    public string icon_name { private get; internal construct; }
-    public bool big         { private get; internal construct; default = false; }
+    [CCode (notify = false)] public string label     { internal construct set { placeholder_label.label = value; }}
+    [CCode (notify = false)] public string icon_name { private get; internal construct; }
+    [CCode (notify = false)] public bool big
+    {
+        internal construct set
+        {
+            if (value)
+            {
+                placeholder_image.pixel_size = 72;
+                get_style_context ().add_class ("big-popover");
+            }
+            else
+            {
+                placeholder_image.pixel_size = 36;
+                get_style_context ().remove_class ("big-popover");
+            }
+        }
+    }
 
     construct
     {
-        if (big)
-        {
-            placeholder_image.pixel_size = 72;
-            get_style_context ().add_class ("big-popover");
-        }
-        else
-            placeholder_image.pixel_size = 36;
-
         placeholder_image.icon_name = icon_name;
+    }
+
+    internal RegistryPlaceholder (string _icon_name, string _label, bool _big)
+    {
+        Object (icon_name:_icon_name, label: _label, big: _big);
     }
 }

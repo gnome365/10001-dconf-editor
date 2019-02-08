@@ -17,7 +17,7 @@
 
 private class SourceManager : Object
 {
-    internal SchemaPathTree cached_schemas { get; private set; default = new SchemaPathTree ("/"); } // prefix tree for quick lookup and diff'ing on changes
+    [CCode (notify = false)] internal SchemaPathTree cached_schemas { internal get; private set; default = new SchemaPathTree ("/"); } // prefix tree for quick lookup and diff'ing on changes
 
     /*\
     * * Schema source
@@ -89,7 +89,7 @@ private class SourceManager : Object
         // TODO i18n but big warning with plurals; and suggest to report a bug?
         if (empty_schemas_needing_warning.length == 1)
         {
-            warning ("Schema with id “" + empty_schemas_needing_warning [0] + "” contains neither keys nor children.");
+            info ("Schema with id “" + empty_schemas_needing_warning [0] + "” contains neither keys nor children.");
             previous_empty_schemas = empty_schemas;
         }
         else if (empty_schemas_needing_warning.length > 1)
@@ -99,7 +99,7 @@ private class SourceManager : Object
                 warning_string += @"  $warning_id\n";
             warning_string += "contain neither keys nor children.";
 
-            warning (warning_string);
+            info (warning_string);
             previous_empty_schemas = empty_schemas;
         }
 

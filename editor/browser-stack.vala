@@ -18,31 +18,61 @@
 using Gtk;
 
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/browser-stack.ui")]
-private class BrowserStack : Grid
+private class BrowserStack : Grid, AdaptativeWidget, BrowserContent
 {
     [GtkChild] private Stack stack;
     [GtkChild] private RegistryView folder_view;
     [GtkChild] private RegistryInfo object_view;
     [GtkChild] private RegistrySearch search_view;
 
-    internal ViewType current_view { get; private set; default = ViewType.FOLDER; }
+    [CCode (notify = false)] internal ViewType current_view { internal get; protected set; default = ViewType.FOLDER; }
 
-    internal bool small_keys_list_rows
+    private void set_window_size (AdaptativeWidget.WindowSize new_size)
     {
-        set
-        {
-            folder_view.small_keys_list_rows = value;
-            search_view.small_keys_list_rows = value;
-        }
+        folder_view.set_window_size (new_size);
+        search_view.set_window_size (new_size);
     }
 
-    internal ModificationsHandler modifications_handler
+    [CCode (notify = false)] public ModificationsHandler modifications_handler
     {
-        set {
+        internal construct
+        {
             folder_view.modifications_handler = value;
             object_view.modifications_handler = value;
             search_view.modifications_handler = value;
         }
+    }
+
+    construct
+    {
+        StyleContext context = get_style_context ();
+        GLib.Settings settings = new GLib.Settings ("ca.desrt.dconf-editor.Settings");
+        bool has_small_keys_list_rows_class = settings.get_boolean ("small-keys-list-rows");
+
+        ulong small_keys_list_rows_handler = settings.changed ["small-keys-list-rows"].connect ((_settings, key_name) => {
+                bool small_rows = _settings.get_boolean (key_name);
+                if (small_rows)
+                {
+                    if (!has_small_keys_list_rows_class) context.add_class ("small-keys-list-rows");
+                }
+                else if (has_small_keys_list_rows_class) context.remove_class ("small-keys-list-rows");
+                has_small_keys_list_rows_class = small_rows;
+
+                folder_view.small_keys_list_rows = small_rows;
+                search_view.small_keys_list_rows = small_rows;
+            });
+
+        if (has_small_keys_list_rows_class)
+            context.add_class ("small-keys-list-rows");
+        folder_view.small_keys_list_rows = has_small_keys_list_rows_class;
+        search_view.small_keys_list_rows = has_small_keys_list_rows_class;
+
+        destroy.connect (() => settings.disconnect (small_keys_list_rows_handler));
+    }
+
+    internal BrowserStack (ModificationsHandler modifications_handler)
+    {
+        Object (modifications_handler: modifications_handler);
     }
 
     /*\
@@ -51,7 +81,7 @@ private class BrowserStack : Grid
 
     internal string get_selected_row_name ()
     {
-        if (current_view != ViewType.OBJECT)
+        if (ViewType.displays_objects_list (current_view))
             return ((RegistryList) stack.get_visible_child ()).get_selected_row_name ();
         return object_view.full_name;
     }
@@ -63,13 +93,22 @@ private class BrowserStack : Grid
         stack.set_transition_type (is_ancestor && current_view != ViewType.SEARCH ? StackTransitionType.CROSSFADE : StackTransitionType.NONE);
     }
 
-    internal void select_row (string selected, uint16 last_context_id)
-        requires (current_view != ViewType.OBJECT)
+    internal void select_row_named (string selected, uint16 last_context_id, bool grab_focus_if_needed)
+        requires (ViewType.displays_objects_list (current_view))
+        requires (selected != "")
     {
-        if (selected == "")
-            ((RegistryList) stack.get_visible_child ()).select_first_row ();
+        ((RegistryList) stack.get_visible_child ()).select_row_named (selected, last_context_id, (current_view == ViewType.FOLDER) && grab_focus_if_needed);
+    }
+
+    internal void select_first_row ()
+        requires (ViewType.displays_objects_list (current_view))
+    {
+        if (current_view == ViewType.SEARCH)
+            ((RegistrySearch) stack.get_visible_child ()).select_first_row ();
+        else if (current_view == ViewType.FOLDER)
+            ((RegistryView) stack.get_visible_child ()).select_first_row ();
         else
-            ((RegistryList) stack.get_visible_child ()).select_row_named (selected, last_context_id, current_view == ViewType.FOLDER);
+            assert_not_reached ();
     }
 
     internal void prepare_object_view (string full_name, uint16 context_id, Variant properties, bool is_parent)
@@ -88,14 +127,16 @@ private class BrowserStack : Grid
         current_view = type;
         if (type == ViewType.FOLDER)
             stack.set_visible_child (folder_view);
-        else if (type == ViewType.OBJECT)
+        else if (ViewType.displays_object_infos (type))
             stack.set_visible_child (object_view);
-        else // (type == ViewType.SEARCH)
+        else if (type == ViewType.SEARCH)
         {
             search_view.start_search (path);
             stack.set_transition_type (StackTransitionType.NONE);
             stack.set_visible_child (search_view);
+            search_view.select_first_row ();
         }
+        else assert_not_reached ();
 
         if (clean_object_view)
             object_view.clean ();
@@ -103,42 +144,42 @@ private class BrowserStack : Grid
             search_view.clean ();
     }
 
-    internal string? get_copy_text ()
+    internal bool handle_copy_text (out string copy_text)
     {
-        return ((BrowsableView) stack.get_visible_child ()).get_copy_text ();
+        return ((BrowsableView) stack.get_visible_child ()).handle_copy_text (out copy_text);
     }
 
-    internal string? get_copy_path_text ()
+    internal bool handle_alt_copy_text (out string copy_text)
     {
         if (current_view == ViewType.SEARCH)
-            return search_view.get_copy_path_text ();
+            return search_view.handle_alt_copy_text (out copy_text);
 
         warning ("BrowserView get_copy_path_text() called but current view is not search results view.");
-        return null;
+        return BaseWindow.no_copy_text (out copy_text);
     }
 
     internal bool toggle_row_popover ()
     {
-        if (current_view != ViewType.OBJECT)
+        if (ViewType.displays_objects_list (current_view))
             return ((RegistryList) stack.get_visible_child ()).toggle_row_popover ();
         return false;
     }
 
     internal void toggle_boolean_key ()
     {
-        if (current_view != ViewType.OBJECT)
+        if (ViewType.displays_objects_list (current_view))
             ((RegistryList) stack.get_visible_child ()).toggle_boolean_key ();
     }
 
     internal void set_selected_to_default ()
     {
-        if (current_view != ViewType.OBJECT)
+        if (ViewType.displays_objects_list (current_view))
             ((RegistryList) stack.get_visible_child ()).set_selected_to_default ();
     }
 
     internal void discard_row_popover ()
     {
-        if (current_view != ViewType.OBJECT)
+        if (ViewType.displays_objects_list (current_view))
             ((RegistryList) stack.get_visible_child ()).discard_row_popover ();
     }
 
@@ -158,9 +199,9 @@ private class BrowserStack : Grid
     * * Reload
     \*/
 
-    internal void set_search_parameters (string current_path, string [] bookmarks, SortingOptions sorting_options)
+    internal void set_search_parameters (bool local_search, string current_path, uint16 current_context_id, string [] bookmarks, SortingOptions sorting_options)
     {
-        search_view.set_search_parameters (current_path, bookmarks, sorting_options);
+        search_view.set_search_parameters (local_search, current_path, current_context_id, bookmarks, sorting_options);
     }
 
     internal bool check_reload_folder (Variant? fresh_key_model)
@@ -196,28 +237,34 @@ private class BrowserStack : Grid
     * * Keyboard calls
     \*/
 
+    internal void row_grab_focus ()
+    {
+        if (ViewType.displays_objects_list (current_view))
+            ((RegistryList) stack.get_visible_child ()).row_grab_focus ();
+    }
+
     internal bool return_pressed ()
         requires (current_view == ViewType.SEARCH)
     {
         return search_view.return_pressed ();
     }
 
-    internal bool up_pressed ()
+    internal bool next_match ()
     {
-        if (current_view != ViewType.OBJECT)
-            return ((RegistryList) stack.get_visible_child ()).up_or_down_pressed (false);
+        if (ViewType.displays_objects_list (current_view))
+            return ((RegistryList) stack.get_visible_child ()).next_match ();
         return false;
     }
 
-    internal bool down_pressed ()
+    internal bool previous_match ()
     {
-        if (current_view != ViewType.OBJECT)
-            return ((RegistryList) stack.get_visible_child ()).up_or_down_pressed (true);
+        if (ViewType.displays_objects_list (current_view))
+            return ((RegistryList) stack.get_visible_child ()).previous_match ();
         return false;
     }
 }
 
 private interface BrowsableView
 {
-    internal abstract string? get_copy_text ();
+    internal abstract bool handle_copy_text (out string copy_text);
 }

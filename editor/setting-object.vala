@@ -17,8 +17,8 @@
 
 private abstract class SettingObject : Object
 {
-    public string name          { internal get; protected construct; }
-    public string full_name     { internal get; protected construct; }
+    [CCode (notify = false)] public string name          { internal get; protected construct; }
+    [CCode (notify = false)] public string full_name     { internal get; protected construct; }
 }
 
 private class Directory : SettingObject
@@ -31,10 +31,10 @@ private class Directory : SettingObject
 
 private abstract class Key : SettingObject
 {
-    internal string type_string { get; protected set; default = "*"; }
+    [CCode (notify = false)] internal string type_string { get; protected set; default = "*"; }
 
-    internal uint key_hash { internal get; private set; default = 0; }
-    internal Variant? all_fixed_properties { internal get; private set; default = null; }
+    [CCode (notify = false)] internal uint key_hash { internal get; private set; default = 0; }
+    [CCode (notify = false)] internal Variant? all_fixed_properties { internal get; private set; default = null; }
     internal static void generate_key_fixed_properties (Key key)
         requires (key.key_hash == 0)
         requires (key.all_fixed_properties == null)
@@ -55,48 +55,6 @@ private abstract class Key : SettingObject
 
     internal signal void value_changed ();
     internal ulong key_value_changed_handler = 0;
-
-    internal static string key_to_description (string type)   // TODO move in model-utils.vala
-    {
-        switch (type)
-        {
-            case "b":
-                return _("Boolean");
-            case "s":
-                return _("String");
-            case "as":
-                return _("String array");
-            case "<enum>":
-                return _("Enumeration");
-            case "<flags>":
-                return _("Flags");
-            case "d":
-                return _("Double");
-            case "h":
-                /* Translators: this handle type is an index; you may maintain the word "handle" */
-                return _("D-Bus handle type");
-            case "o":
-                return _("D-Bus object path");
-            case "ao":
-                return _("D-Bus object path array");
-            case "g":
-                return _("D-Bus signature");
-            case "y":       // TODO byte, bytestring, bytestring array
-            case "n":
-            case "q":
-            case "i":
-            case "u":
-            case "x":
-            case "t":
-                return _("Integer");
-            case "v":
-                return _("Variant");
-            case "()":
-                return _("Empty tuple");
-            default:
-                return type;
-        }
-    }
 
     protected static void get_min_and_max_string (out string min, out string max, string type_string)
     {
@@ -211,19 +169,34 @@ private abstract class Key : SettingObject
         if (capitalized)
         {
             if (nullable_boolean == true)
+                /* Translators: the boolean "true" value; capitalized (if that makes sense) */
                 return _("True");
+
             if (nullable_boolean == false)
+                /* Translators: the boolean "false" value; capitalized (if that makes sense) */
                 return _("False");
+
+            /* Translators: "nothing" value of a nullable key; capitalized (if that makes sense); "nothing" here is a keyword, but you do not need to show it in your translation, that will be done with the non-capitalized version of the word */
             return _("Nothing");
         }
         else
         {
             if (nullable_boolean == true)
+                /* Translators: the boolean "true" value; non capitalized (if that makes sense) */
                 return _("true");
+
             if (nullable_boolean == false)
+                /* Translators: the boolean "false" value; non capitalized (if that makes sense) */
                 return _("false");
-            /* Translators: "nothing" here is a keyword that should appear for consistence; please translate as "yourtranslation (nothing)" */
-            return _("nothing");
+
+
+            /* Translators: "nothing" value of a nullable key; non capitalized (if that makes sense); the %s is replaced by the text "nothing" (as a technical keyword); it isn't introduced with quotation marks around it, but you might want to add some, depending of your language typographic rules */
+            string nothing = _("nothing (%s)").printf ("nothing");
+            if (nothing != "nothing (nothing)")
+                return nothing;
+
+            /* Translators: "nothing" value of a nullable key; non capitalized (if that makes sense) */
+            return _("nothing");    // it has been asked to translate that as "atranslation (nothing)"
         }
     }
 
@@ -269,8 +242,11 @@ private class DConfKey : Key
 
     private ulong client_changed_handler = 0;
     internal void connect_client (DConf.Client client)
-        requires (client_changed_handler == 0)
+//        requires (client_changed_handler == 0)
     {
+        if (client_changed_handler != 0)    // FIXME happens since editable paths 1/3
+            return;
+
         client_changed_handler = client.changed.connect ((client, prefix, changes, tag) => {
                 foreach (string item in changes)
                     if (prefix + item == full_name)
@@ -281,8 +257,11 @@ private class DConfKey : Key
             });
     }
     internal void disconnect_client (DConf.Client client)
-        requires (client_changed_handler != 0)
+//        requires (client_changed_handler != 0)
     {
+        if (client_changed_handler == 0)    // FIXME happens since editable paths 2/3
+            return;
+
         client.disconnect (client_changed_handler);
         client_changed_handler = 0;
     }
@@ -298,7 +277,8 @@ private class DConfKey : Key
         if (all_properties_queried || PropertyQuery.TYPE_CODE       in query)
             variantdict.insert_value (PropertyQuery.TYPE_CODE,                  new Variant.string (dkey.type_string));
 
-        if (show_min_and_max (dkey.type_string) && (all_properties_queried || PropertyQuery.MINIMUM in query || PropertyQuery.MAXIMUM in query))
+        if (show_min_and_max (dkey.type_string)
+         && (all_properties_queried || PropertyQuery.MINIMUM in query || PropertyQuery.MAXIMUM in query))
         {
             string min, max;
             get_min_and_max_string (out min, out max, dkey.type_string);
@@ -313,17 +293,17 @@ private class GSettingsKey : Key
 {
     internal KeyConflict key_conflict = KeyConflict.NONE;
 
-    public string? schema_path      { private get; internal construct; }
-    public string summary           { private get; internal construct; }
-    public string description       { private get; internal construct; }
-    public string schema_id        { internal get; internal construct; }
-    public Variant default_value   { internal get; internal construct; }
-    public RangeType range_type    { internal get; internal construct; }
-    public Variant range_content   { internal get; internal construct; }
+    [CCode (notify = false)] public string? schema_path      { private get; internal construct; }
+    [CCode (notify = false)] public string summary           { private get; internal construct; }
+    [CCode (notify = false)] public string description       { private get; internal construct; }
+    [CCode (notify = false)] public string schema_id        { internal get; internal construct; }
+    [CCode (notify = false)] public Variant default_value   { internal get; internal construct; }
+    [CCode (notify = false)] public RangeType range_type    { internal get; internal construct; }
+    [CCode (notify = false)] public Variant range_content   { internal get; internal construct; }
 
-    public GLib.Settings settings  { internal get; internal construct; }
+    [CCode (notify = false)] public GLib.Settings settings  { internal get; internal construct; }
 
-    internal string descriptor {
+    [CCode (notify = false)] internal string descriptor {
         owned get {
             string parent_path;
             if (full_name.length < 2)
@@ -426,8 +406,13 @@ private class GSettingsKey : Key
 private string get_defined_by (bool has_schema, bool fixed_schema = false)
 {
     if (fixed_schema)
+        /* Translators: field content when displaying key properties; the field description is "Defined by", this text is displayed if the key is defined by a schema, and if this schema has a fixed path (it is not relocatable) */
         return _("Schema with path");
+
     if (has_schema)
+        /* Translators: field content when displaying key properties; the field description is "Defined by", this text is displayed if the key is defined by a schema, and if this schema is relocatable (it has not a fixed path) */
         return _("Relocatable schema");
+
+    /* Translators: field content when displaying key properties; the field description is "Defined by", this text is displayed if the key is not defined by a schema (the value is given by dconf but cannot be used by the GSettings functions) */
     return _("DConf backend");
 }

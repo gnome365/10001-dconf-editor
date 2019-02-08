@@ -17,7 +17,7 @@
 
 using Gtk;
 
-const int MAX_ROW_WIDTH = 1000;
+private const int MAX_ROW_WIDTH = LARGE_WINDOW_SIZE - 42;
 
 private class ListBoxRowWrapper : ListBoxRow
 {
@@ -47,18 +47,14 @@ private class ListBoxRowHeader : Grid
 
     internal ListBoxRowHeader (bool is_first_row, string? header_text)
     {
-        if (header_text == null)
-        {
-            if (is_first_row)
-                return;
-        }
-        else
+        if (header_text != null)
         {
             orientation = Orientation.VERTICAL;
 
             Label label = new Label ((!) header_text);
             label.visible = true;
             label.halign = Align.START;
+            label.set_ellipsize (Pango.EllipsizeMode.END);
             StyleContext context = label.get_style_context ();
             context.add_class ("dim-label");
             context.add_class ("header-label");
@@ -66,6 +62,9 @@ private class ListBoxRowHeader : Grid
         }
 
         halign = Align.CENTER;
+
+        if (is_first_row)
+            return;
 
         Separator separator = new Separator (Orientation.HORIZONTAL);
         separator.visible = true;
@@ -76,29 +75,10 @@ private class ListBoxRowHeader : Grid
 
 private abstract class ClickableListBoxRow : EventBox
 {
-    public bool search_result_mode  { internal get; protected construct; default = false; }
+    [CCode (notify = false)] public bool search_result_mode  { internal get; protected construct; default = false; }
 
-    public string full_name         { internal get; protected construct; }
-    public uint16 context_id        { internal get; protected construct; }
-
-    /*\
-    * * Dismiss popover on window resize
-    \*/
-
-    private int width;
-
-    construct
-    {
-        size_allocate.connect (on_size_allocate);
-    }
-
-    private void on_size_allocate (Allocation allocation)
-    {
-        if (allocation.width == width)
-            return;
-        hide_right_click_popover ();
-        width = allocation.width;
-    }
+    [CCode (notify = false)] public string full_name         { internal get; protected construct; }
+    [CCode (notify = false)] public uint16 context_id        { internal get; protected construct; }
 
     /*\
     * * right click popover stuff
@@ -126,33 +106,86 @@ private abstract class ClickableListBoxRow : EventBox
     }
 }
 
+[GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/return-list-box-row.ui")]
+private class ReturnListBoxRow : ClickableListBoxRow
+{
+    [GtkChild] private Label folder_name_label;
+
+    internal ReturnListBoxRow (string _full_name, uint16 _context_id)
+    {
+        Object (full_name: _full_name, context_id: _context_id, search_result_mode: true);
+        /* Translators: first item of the keys list displayed during a search, the %s is a folder path usually */
+        folder_name_label.set_text (_("Go to “%s”").printf (_full_name));
+    }
+}
+
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/folder-list-box-row.ui")]
 private class FolderListBoxRow : ClickableListBoxRow
 {
     [GtkChild] private Label folder_name_label;
 
-    internal FolderListBoxRow (string label, string path, bool search_result_mode)
+    [CCode (notify = false)] public bool path_search { internal get; internal construct; }
+
+    internal FolderListBoxRow (string label, string path, bool path_search, bool search_result_mode)
     {
-        Object (full_name: path, context_id: ModelUtils.folder_context_id, search_result_mode: search_result_mode);
+        Object (full_name: path, context_id: ModelUtils.folder_context_id, path_search: path_search, search_result_mode: search_result_mode);
         folder_name_label.set_text (search_result_mode ? path : label);
     }
 }
 
+[GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/filter-list-box-row.ui")]
+private class FilterListBoxRow : ClickableListBoxRow
+{
+    public bool is_local_search { internal get; protected construct; }
+
+    [GtkChild] private Label folder_name_label;
+
+    internal FilterListBoxRow (string name, string path)
+    {
+        Object (is_local_search: name != "" && path != "/", full_name: path, context_id: ModelUtils.folder_context_id, search_result_mode: true);
+
+        if (is_local_search)
+            /* Translators: first item of the keys list displayed during browsing, the %s is the current folder name */
+            folder_name_label.set_text (_("Search in “%s” folder").printf (name));
+
+        else if (path == "/")
+            /* Translators: first item of the keys list displayed during browsing at root path */
+            folder_name_label.set_text (_("Open path entry"));
+
+        else
+            /* Translators: last item of the keys list displayed during a local search */
+            folder_name_label.set_text (_("Search everywhere"));
+    }
+}
+
+[GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/search-list-box-row.ui")]
+private class SearchListBoxRow : ClickableListBoxRow
+{
+    [GtkChild] private Label search_label;
+
+    internal SearchListBoxRow (string search)
+    {
+        Object (full_name: search, context_id: ModelUtils.undefined_context_id);
+        search_label.set_text (search);
+    }
+}
+
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/key-list-box-row.ui")]
-private class KeyListBoxRow : ClickableListBoxRow
+private class KeyListBoxRow : ClickableListBoxRow, AdaptativeWidget
 {
     [GtkChild] private Grid key_name_and_value_grid;
     [GtkChild] private Label key_name_label;
+    [GtkChild] private Label key_type_label;
     [GtkChild] private Label key_value_label;
     [GtkChild] private Label key_info_label;
     private Switch? boolean_switch = null;
 
-    public string key_name    { internal get; internal construct; }
-    public string type_string { internal get; internal construct; }
-    public bool has_schema    { internal get; internal construct; }
+    [CCode (notify = false)] public string key_name    { internal get; internal construct; }
+    [CCode (notify = false)] public string type_string { internal get; internal construct; }
+    [CCode (notify = false)] public bool has_schema    { internal get; internal construct; }
 
     private bool _delay_mode = false;
-    internal bool delay_mode
+    [CCode (notify = false)] internal bool delay_mode
     {
         private get
         {
@@ -166,7 +199,7 @@ private class KeyListBoxRow : ClickableListBoxRow
         }
     }
 
-    internal bool small_keys_list_rows
+    [CCode (notify = false)] internal bool small_keys_list_rows
     {
         set
         {
@@ -183,6 +216,31 @@ private class KeyListBoxRow : ClickableListBoxRow
         }
     }
 
+    private bool thin_window = false;
+    internal void set_window_size (AdaptativeWidget.WindowSize new_size)
+    {
+        bool _thin_window = AdaptativeWidget.WindowSize.is_extra_thin (new_size);
+        if (thin_window == _thin_window)
+            return;
+        thin_window = _thin_window;
+
+        if (_thin_window)
+        {
+            if (boolean_switch != null)
+                ((!) boolean_switch).hide ();
+            key_value_label.hide ();
+            key_type_label.show ();
+        }
+        else
+        {
+            key_type_label.hide ();
+            if (_use_switch && !delay_mode)
+                ((!) boolean_switch).show ();
+            else
+                key_value_label.show ();
+        }
+    }
+
     construct
     {
         if (has_schema)
@@ -194,11 +252,12 @@ private class KeyListBoxRow : ClickableListBoxRow
         {
             boolean_switch = new Switch ();
             ((!) boolean_switch).can_focus = false;
+            ((!) boolean_switch).halign = Align.END;
             ((!) boolean_switch).valign = Align.CENTER;
             if (has_schema)
-                ((!) boolean_switch).set_detailed_action_name ("ui.empty(('',uint16 0,true,true))");
+                ((!) boolean_switch).set_detailed_action_name ("browser.empty(('',uint16 0,true,true))");
             else
-                ((!) boolean_switch).set_detailed_action_name ("ui.empty(('',true))");
+                ((!) boolean_switch).set_detailed_action_name ("browser.empty(('',true))");
 
             _use_switch = true;
             hide_or_show_switch ();
@@ -234,9 +293,12 @@ private class KeyListBoxRow : ClickableListBoxRow
 
     internal void toggle_boolean_key ()
     {
+        if (type_string != "b")
+            return;
         if (boolean_switch == null)
             return;
-        ((!) boolean_switch).activate ();
+        bool state = ((!) boolean_switch).get_active ();
+        ((!) boolean_switch).set_active (!state);
     }
 
     internal void change_dismissed ()
@@ -267,7 +329,7 @@ private class KeyListBoxRow : ClickableListBoxRow
             if (has_schema)
             {
                 variant = new Variant ("(sq)", full_name, context_id);
-                actionable.set_detailed_action_name ("bro.set-to-default(" + variant.print (true) + ")");
+                actionable.set_detailed_action_name ("view.set-to-default(" + variant.print (true) + ")");
             }
             else
             {
@@ -278,7 +340,7 @@ private class KeyListBoxRow : ClickableListBoxRow
         else
         {
             variant = new Variant ("(sqv)", full_name, context_id, (!) new_value);
-            actionable.set_detailed_action_name ("bro.set-key-value(" + variant.print (true) + ")");
+            actionable.set_detailed_action_name ("view.set-key-value(" + variant.print (true) + ")");
         }
         Container child = (Container) get_child ();
         child.add (actionable);
@@ -291,22 +353,25 @@ private class KeyListBoxRow : ClickableListBoxRow
     * * Updating
     \*/
 
-    internal void update_label (string key_value_string, bool italic)
+    private bool key_value_label_has_italic_label_class = false;
+    private bool key_type_label_has_italic_label_class = false;
+    internal void update_label (string key_value_string, bool key_value_italic, string key_type_string, bool key_type_italic)
     {
-        if (italic)
+        if (key_value_italic)
         {
-            StyleContext context = key_value_label.get_style_context ();
-            if (!context.has_class ("italic-label"))
-                context.add_class ("italic-label");
+            if (!key_value_label_has_italic_label_class) key_value_label.get_style_context ().add_class ("italic-label");
         }
-        else
-        {
-            StyleContext context = key_value_label.get_style_context ();
-            if (context.has_class ("italic-label"))
-                context.remove_class ("italic-label");
-        }
-
+        else if (key_value_label_has_italic_label_class) key_value_label.get_style_context ().remove_class ("italic-label");
+        key_value_label_has_italic_label_class = key_value_italic;
         key_value_label.set_label (key_value_string);
+
+        if (key_type_italic)
+        {
+            if (!key_type_label_has_italic_label_class) key_type_label.get_style_context ().add_class ("italic-label");
+        }
+        else if (key_type_label_has_italic_label_class) key_type_label.get_style_context ().remove_class ("italic-label");
+        key_type_label_has_italic_label_class = key_type_italic;
+        key_type_label.set_label (key_type_string);
     }
 
     private bool _use_switch = false;
@@ -322,14 +387,22 @@ private class KeyListBoxRow : ClickableListBoxRow
     private void hide_or_show_switch ()
         requires (boolean_switch != null)
     {
-        if (_use_switch && !delay_mode)
+        if (thin_window)
         {
             key_value_label.hide ();
+            ((!) boolean_switch).hide ();
+            key_type_label.show ();
+        }
+        else if (_use_switch && !delay_mode)
+        {
+            key_value_label.hide ();
+            key_type_label.hide ();
             ((!) boolean_switch).show ();
         }
         else
         {
             ((!) boolean_switch).hide ();
+            key_type_label.hide ();
             key_value_label.show ();
         }
     }
@@ -337,7 +410,7 @@ private class KeyListBoxRow : ClickableListBoxRow
     internal void update_switch (bool key_value_boolean, string detailed_action_name)
         requires (boolean_switch != null)
     {
-        ((!) boolean_switch).set_action_name ("ui.empty");
+        ((!) boolean_switch).set_action_name ("browser.empty");
         ((!) boolean_switch).set_active (key_value_boolean);
         ((!) boolean_switch).set_detailed_action_name (detailed_action_name);
     }
@@ -392,11 +465,20 @@ private class ContextPopover : Popover
             /* Translators: "erase key" action in the right-click menu on a key without schema */
             case "erase":           action_text = _("Erase key");           break;
 
+            /* Translators: "go to" action in the right-click menu on a "go back" line during search */
+            case "go-back":         action_text = _("Go to this path");     break;
+
             /* Translators: "open folder" action in the right-click menu on a folder */
-            case "open":            action_text = _("Open");                break;
+            case "open-folder":     action_text = _("Open");                break;
+
+            /* Translators: "open" action in the right-click menu on a "show folder info" row */
+            case "open-config":     action_text = _("Show properties");     break;
+
+            /* Translators: "open search" action in the right-click menu on a search */
+            case "open-search":     action_text = _("Search");              break;
 
             /* Translators: "open parent folder" action in the right-click menu on a folder in a search result */
-            case "open_parent":     action_text = _("Open parent folder");  break;
+            case "open-parent":     action_text = _("Open parent folder");  break;
 
             /* Translators: "reset recursively" action in the right-click menu on a folder */
             case "recursivereset":  action_text = _("Reset recursively");   break;

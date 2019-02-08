@@ -18,14 +18,14 @@
 private abstract class SettingsModelCore : Object
 {
     private SourceManager source_manager = new SourceManager ();
-    internal bool refresh_source { get; set; default = true; }
+    [CCode (notify = false)] internal bool refresh_source { private get; internal set; default = true; }
 
     private DConf.Client client = new DConf.Client ();
     private string? last_change_tag = null;
     protected bool copy_action = false;
     private bool gsettings_change = false;
 
-    internal bool use_shortpaths { private get; set; default = false; }
+    [CCode (notify = false)] internal bool use_shortpaths { private get; internal set; default = false; }
 
     internal signal void paths_changed (GenericSet<string> modified_path_specs, bool internal_changes);
     private bool paths_has_changed = false;
@@ -195,22 +195,26 @@ private abstract class SettingsModelCore : Object
         return builder.end ();
     }
 
-    protected bool _get_object (string path, out uint16 context_id, out string name)
+    protected bool _get_object (string path, out uint16 context_id, out string name, bool watch)
     {
         SettingObject? object;
-        if (ModelUtils.is_key_path (path))
-            object = (SettingObject?) get_key (path, "");
-        else
+        bool is_folder_path = ModelUtils.is_folder_path (path);
+        if (is_folder_path)
             object = (SettingObject?) get_directory (path);
+        else
+            object = (SettingObject?) get_key (path, "");
 
         if (object == null)
         {
-            context_id = ModelUtils.undefined_context_id;   // garbage 1/2
-            name = "";                                      // garbage 2/2
+            if (is_folder_path)
+                context_id = ModelUtils.folder_context_id;
+            else
+                context_id = ModelUtils.undefined_context_id;   // garbage 1/2
+            name = "";                                          // garbage 2/2
             return false;
         }
 
-        if ((!) object is Key)
+        if (watch && (!) object is Key)
             add_watched_key ((Key) (!) object);
 
         context_id = get_context_id_from_object ((!) object);
@@ -631,7 +635,8 @@ private abstract class SettingsModelCore : Object
                 ((DConfKey) key).disconnect_client (client);
             else assert_not_reached ();
 
-            key.disconnect (key.key_value_changed_handler);
+            if (key.key_value_changed_handler != 0) // FIXME happens since editable paths 3/3
+                key.disconnect (key.key_value_changed_handler);
             key.key_value_changed_handler = 0;
 
             position++;
@@ -936,6 +941,7 @@ private abstract class SettingsModelCore : Object
     {
         Variant? key_value = get_dconf_key_value_or_null (key_path, client);
         if (key_value == null)
+            /* Translators: text copied when the users request a copy while an erased key is selected; the %s is the key path */
             return _("%s (key erased)").printf (key_path);
         else
             return key_path + " " + ((!) key_value).print (false);
@@ -976,6 +982,14 @@ private class SettingsModel : SettingsModelCore
     * * Directories informations
     \*/
 
+    internal Variant _get_folder_properties (string folder_path)
+    {
+        RegistryVariantDict variantdict = new RegistryVariantDict ();
+
+        variantdict.insert_value (PropertyQuery.KEY_NAME, new Variant.string (ModelUtils.get_name (folder_path)));
+        return variantdict.end ();
+    }
+
     internal Variant? get_children (string folder_path, bool watch = false, bool clean_watched = false)
         requires (ModelUtils.is_folder_path (folder_path))
     {
@@ -1015,9 +1029,9 @@ private class SettingsModel : SettingsModelCore
         copy_action = true;
     }
 
-    internal bool get_object (string path, out uint16 context_id, out string name)
+    internal bool get_object (string path, out uint16 context_id, out string name, bool watch = true)
     {
-        return _get_object (path, out context_id, out name);
+        return _get_object (path, out context_id, out name, watch);
     }
 
     internal string get_fallback_path (string path)
@@ -1117,6 +1131,12 @@ private class SettingsModel : SettingsModelCore
     /*\
     * * Keys properties
     \*/
+
+    internal Variant get_folder_properties (string folder_path)
+        requires (ModelUtils.is_folder_path (folder_path))
+    {
+        return _get_folder_properties (folder_path);
+    }
 
     internal Variant get_key_properties (string key_path, uint16 key_context_id, uint16 query)
         requires (ModelUtils.is_key_path (key_path))

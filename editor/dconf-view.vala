@@ -17,841 +17,296 @@
 
 using Gtk;
 
-private interface KeyEditorChild : Widget
+private class DConfView : BookmarksView, AdaptativeWidget
 {
-    internal signal void value_has_changed (bool is_valid = true);
-
-    internal abstract Variant get_variant ();
-    internal signal void child_activated ();
-
-    internal abstract void reload (Variant gvariant);
-}
-
-private class KeyEditorChildSingle : Label, KeyEditorChild
-{
-    private Variant variant;
-
-    internal KeyEditorChildSingle (Variant key_value, string text)
-    {
-        variant = key_value;
-        set_label (text);
-        show ();
-    }
-
-    internal Variant get_variant ()
-    {
-        return variant;
-    }
-
-    internal void reload (Variant gvariant) {}
-}
-
-private class KeyEditorChildEnum : MenuButton, KeyEditorChild
-{
-    private Variant variant;
-    private GLib.Action action;
-
-    internal KeyEditorChildEnum (Variant initial_value, bool delay_mode, bool has_planned_change, Variant range_content)
-    {
-        this.visible = true;
-        this.hexpand = true;
-        this.halign = Align.START;
-        this.use_popover = true;
-        this.width_request = 100;
-
-        ContextPopover popover = new ContextPopover ();
-        action = popover.create_buttons_list (false, delay_mode, has_planned_change, "<enum>", range_content, initial_value);
-        popover.set_relative_to (this);
-
-        popover.value_changed.connect (on_popover_value_changed);
-        reload (initial_value);
-        this.set_popover ((Popover) popover);
-    }
-    private void on_popover_value_changed (ContextPopover _popover, Variant? gvariant)
-        requires (gvariant != null)
-    {
-        reload ((!) gvariant);
-        _popover.closed ();
-
-        value_has_changed ();
-    }
-
-    internal Variant get_variant ()
-    {
-        return variant;
-    }
-
-    internal void reload (Variant gvariant)
-    {
-        variant = gvariant;
-        VariantType type = gvariant.get_type ();
-        label = type == VariantType.STRING ? gvariant.get_string () : gvariant.print (false);
-        action.change_state (new Variant.maybe (null, new Variant.maybe (type, gvariant)));
-    }
-}
-
-private class KeyEditorChildFlags : Grid, KeyEditorChild
-{
-    private string [] all_flags;
-    private ContextPopover popover = new ContextPopover ();
-
-    private Variant variant;
-    private Label label = new Label ("");
-
-    internal KeyEditorChildFlags (Variant initial_value, string [] _all_flags)
-    {
-        all_flags = _all_flags;
-        this.visible = true;
-        this.hexpand = true;
-        this.orientation = Orientation.HORIZONTAL;
-        this.column_spacing = 8;
-
-        MenuButton button = new MenuButton ();
-        button.visible = true;
-        button.use_popover = true;
-        button.halign = Align.START;
-        button.get_style_context ().add_class ("image-button");
-        this.add (button);
-
-        label.visible = true;
-        label.halign = Align.START;
-        label.hexpand = true;
-        this.add (label);
-
-        popover.create_flags_list (initial_value.get_strv (), all_flags);
-        popover.set_relative_to (button);
-        popover.value_changed.connect (on_popover_value_changed);
-        reload (initial_value);
-        button.set_popover ((Popover) popover);
-    }
-    private void on_popover_value_changed (Popover _popover, Variant? gvariant)
-        requires (gvariant != null)
-    {
-        reload ((!) gvariant);
-        value_has_changed ();
-    }
-
-    internal void update_flags (string [] active_flags)
-    {
-        foreach (string flag in all_flags)
-            popover.update_flag_status (flag, flag in active_flags);
-    }
-
-    internal Variant get_variant ()
-    {
-        return variant;
-    }
-
-    internal void reload (Variant gvariant)
-    {
-        this.variant = gvariant;
-        label.label = gvariant.print (false);
-    }
-}
-
-private class KeyEditorChildNullableBool : MenuButton, KeyEditorChild
-{
-    private Variant variant;
-    private Variant? maybe_variant;
-    private GLib.Action action;
-
-    internal KeyEditorChildNullableBool (Variant initial_value, bool delay_mode, bool has_planned_change, bool has_schema)
-    {
-        this.visible = true;
-        this.hexpand = true;
-        this.halign = Align.START;
-        this.use_popover = true;
-        this.width_request = 100;
-
-        Variant? meaningless_variant_or_null = null;  // only used for adding or not "set to default"
-        if (has_schema)
-            meaningless_variant_or_null = new Variant.boolean (true);
-
-        ContextPopover popover = new ContextPopover ();
-        action = popover.create_buttons_list (false, delay_mode, has_planned_change, "mb", meaningless_variant_or_null, initial_value);
-        popover.set_relative_to (this);
-
-        popover.value_changed.connect (on_popover_value_changed);
-        reload (initial_value);
-        this.set_popover ((Popover) popover);
-    }
-    private void on_popover_value_changed (Popover _popover, Variant? gvariant)
-        requires (gvariant != null)
-    {
-        reload ((!) gvariant);
-        _popover.closed ();
-
-        value_has_changed ();
-    }
-
-    internal Variant get_variant ()
-    {
-        return variant;
-    }
-
-    internal void reload (Variant gvariant)
-    {
-        variant = gvariant;
-        maybe_variant = variant.get_maybe ();
-
-        if (maybe_variant == null)
-            label = Key.cool_boolean_text_value (null);
-        else
-            label = Key.cool_boolean_text_value (((!) maybe_variant).get_boolean ());
-
-        action.change_state (new Variant.maybe (null, new Variant.maybe (new VariantType ("mb"), gvariant)));
-    }
-}
-
-private class KeyEditorChildBool : Box, KeyEditorChild // might be managed by action, but can't find a way to ensure one-and-only-one button is active  // https://bugzilla.gnome.org/show_bug.cgi?id=769876
-{
-    private ToggleButton button_true;
-
-    internal KeyEditorChildBool (bool initial_value)
-    {
-        this.visible = true;
-        this.hexpand = true;
-        this.orientation = Orientation.HORIZONTAL;
-        this.halign = Align.START;
-        this.homogeneous = true;
-        this.width_request = 100;
-        this.get_style_context ().add_class ("linked");
-
-        ToggleButton button_false = new ToggleButton ();
-        button_false.visible = true;
-        button_false.label = Key.cool_boolean_text_value (false);
-        this.add (button_false);
-
-        button_true = new ToggleButton ();
-        button_true.visible = true;
-        button_true.label = Key.cool_boolean_text_value (true);
-        this.add (button_true);
-
-        button_true.active = initial_value;
-        button_true.bind_property ("active", button_false, "active", BindingFlags.INVERT_BOOLEAN|BindingFlags.SYNC_CREATE|BindingFlags.BIDIRECTIONAL);
-
-        button_true.toggled.connect (() => value_has_changed ());
-    }
-
-    internal Variant get_variant ()
-    {
-        return new Variant.boolean (button_true.active);
-    }
-
-    internal void reload (Variant gvariant)
-    {
-        button_true.active = gvariant.get_boolean ();
-    }
-}
-
-private abstract class KeyEditorChildNumberCustom : Entry, KeyEditorChild
-{
-    protected Variant variant;
-
-    protected ulong deleted_text_handler = 0;
-    protected ulong inserted_text_handler = 0;
+    private BrowserStack dconf_content;
 
     construct
     {
-        get_style_context ().add_class ("key-editor-child-entry");
+        install_action_entries ();
     }
 
-    protected void connect_entry ()
+    internal DConfView (ModificationsHandler modifications_handler)
     {
-        EntryBuffer ref_buffer = buffer;    // an EntryBuffer doesn't emit a "destroy" signal
-        deleted_text_handler = ref_buffer.deleted_text.connect (() => value_has_changed (test_value ()));
-        inserted_text_handler = ref_buffer.inserted_text.connect (() => value_has_changed (test_value ()));
-        ulong entry_activate_handler = activate.connect (() => { if (test_value ()) child_activated (); });
-
-        destroy.connect (() => {
-                ref_buffer.disconnect (deleted_text_handler);
-                ref_buffer.disconnect (inserted_text_handler);
-                disconnect (entry_activate_handler);
-            });
+        BrowserStack _dconf_content = new BrowserStack (modifications_handler);
+        _dconf_content.show ();
+        Object (browser_content: (BrowserContent) _dconf_content, modifications_handler: modifications_handler);
+        dconf_content = _dconf_content;
     }
 
-    protected void show_error (bool show)
+    protected override void set_window_size (AdaptativeWidget.WindowSize new_size)
     {
-        StyleContext context = get_style_context ();
-        if (show)
+        base.set_window_size (new_size);
+
+        if (modifications_list_created)
+            modifications_list.set_window_size (new_size);
+    }
+
+    private ModificationsHandler _modifications_handler;
+    [CCode (notify = false)] public ModificationsHandler modifications_handler
+    {
+        private get { return _modifications_handler; }
+        internal construct
         {
-            // TODO "error" style class should not be active/visible when the default-value toggle is activated (and the entry inactive)
-            if (!context.has_class ("error"))
-                context.add_class ("error");
-            secondary_icon_name = "dialog-error-symbolic";
+            _modifications_handler = value;
+            sorting_options = new SortingOptions (value.model);
+            sorting_options.notify ["case-sensitive"].connect (on_case_sensitive_changed);
+            _modifications_handler.delayed_changes_changed.connect (update_in_window_modifications);
+        }
+    }
+
+    internal override bool is_in_in_window_mode ()
+    {
+        return (in_window_modifications || base.is_in_in_window_mode ());
+    }
+
+    internal override void show_default_view ()
+    {
+        if (in_window_modifications)
+        {
+            in_window_modifications = false;
+            set_visible_child_name ("main-view");
         }
         else
-        {
-            if (context.has_class ("error"))
-                context.remove_class ("error");
-            set_icon_from_icon_name (EntryIconPosition.SECONDARY, null);
-        }
+            base.show_default_view ();
     }
 
-    internal Variant get_variant ()
+    /*\
+    * * Action entries
+    \*/
+
+    private void install_action_entries ()
     {
-        return variant;
+        SimpleActionGroup action_group = new SimpleActionGroup ();
+        action_group.add_action_entries (action_entries, this);
+        insert_action_group ("view", action_group);
     }
 
-    private void set_lock (bool state)
-        requires (deleted_text_handler != 0 && inserted_text_handler != 0)
+    private const GLib.ActionEntry [] action_entries =
     {
-        if (state)
-        {
-            SignalHandler.block (buffer, deleted_text_handler);
-            SignalHandler.block (buffer, inserted_text_handler);
-        }
+        { "set-key-value",               set_key_value,                 "(sqv)"  },
+        { "set-to-default",              set_to_default,                "(sq)"   },
+        { "delay-erase",                 delay_erase,                   "s"      },  // see also ui.erase(s)
+
+        { "toggle-dconf-key-switch",     toggle_dconf_key_switch,       "(sb)"   },
+        { "toggle-gsettings-key-switch", toggle_gsettings_key_switch,   "(sqbb)" }
+    };
+
+    private void set_key_value (SimpleAction action, Variant? value_variant)
+        requires (value_variant != null)
+    {
+        string full_name;
+        uint16 context_id;
+        Variant key_value_request;
+        ((!) value_variant).@get ("(sqv)", out full_name, out context_id, out key_value_request);
+
+        if (modifications_handler.get_current_delay_mode ())
+            modifications_handler.add_delayed_setting (full_name, key_value_request, context_id);
+        else if (!ModelUtils.is_dconf_context_id (context_id))
+            modifications_handler.set_gsettings_key_value (full_name, context_id, key_value_request);
         else
-        {
-            SignalHandler.unblock (buffer, deleted_text_handler);
-            SignalHandler.unblock (buffer, inserted_text_handler);
-        }
+            modifications_handler.set_dconf_key_value (full_name, key_value_request);
     }
 
-    internal void reload (Variant gvariant)
+    private void delay_erase (SimpleAction action, Variant? path_variant)
+        requires (path_variant != null)
     {
-        set_lock (true);
-        this.text = gvariant.print (false);
-        if (!test_value ())
+        string full_name_or_empty = ((!) path_variant).get_string ();
+        if (full_name_or_empty == "")
+            return;
+        modifications_handler.enter_delay_mode ();
+        modifications_handler.add_delayed_setting (full_name_or_empty, null, ModelUtils.dconf_context_id);
+    }
+
+    private void set_to_default (SimpleAction action, Variant? path_variant)
+        requires (path_variant != null)
+    {
+        string full_name;
+        uint16 context_id;
+        ((!) path_variant).@get ("(sq)", out full_name, out context_id);
+        modifications_handler.set_to_default (full_name, context_id);
+        invalidate_popovers ();
+    }
+
+    private void toggle_dconf_key_switch (SimpleAction action, Variant? value_variant)
+        requires (value_variant != null)
+    {
+        if (modifications_handler.get_current_delay_mode ())
             assert_not_reached ();
-        set_lock (false);
+
+        string full_name;
+        bool key_value_request;
+        ((!) value_variant).@get ("(sb)", out full_name, out key_value_request);
+
+        modifications_handler.set_dconf_key_value (full_name, key_value_request);
     }
 
-    protected abstract bool test_value ();
-}
-
-private class KeyEditorChildNumberDouble : KeyEditorChildNumberCustom
-{
-    private double min;
-    private double max;
-
-    internal KeyEditorChildNumberDouble (Variant initial_value, Variant? range_content_or_null)
+    private void toggle_gsettings_key_switch (SimpleAction action, Variant? value_variant)
+        requires (value_variant != null)
     {
-        this.variant = initial_value;
-
-        this.visible = true;
-        this.hexpand = true;
-        this.secondary_icon_activatable = false;
-        this.set_icon_tooltip_text (EntryIconPosition.SECONDARY, _("Failed to parse as double."));  // TODO change text for range
-
-        this.text = initial_value.print (false);
-
-        if (range_content_or_null != null)
-        {
-            min = ((!) range_content_or_null).get_child_value (0).get_double ();
-            max = ((!) range_content_or_null).get_child_value (1).get_double ();
-        }
-        else
-        {
-            min = -double.MAX; // https://gitlab.gnome.org/GNOME/vala/issues/680
-            max = double.MAX;
-        }
-
-        connect_entry ();
-    }
-
-    protected override bool test_value ()
-    {
-        Variant? tmp_variant;
-        string tmp_text = this.text; // don't put in the try{} for correct C code
-        try
-        {
-            tmp_variant = Variant.parse (VariantType.DOUBLE, tmp_text);
-        }
-        catch (VariantParseError e)
-        {
-            show_error (true);
-            return false;
-        }
-
-        double variant_value = ((!) tmp_variant).get_double ();
-        if ((variant_value < min) || (variant_value > max))
-        {
-            show_error (true);
-            return false;
-        }
-        else
-        {
-            variant = (!) tmp_variant;
-            show_error (false);
-            return true;
-        }
-    }
-}
-
-private class KeyEditorChildNumberInt64 : KeyEditorChildNumberCustom
-{
-    private int64 min;
-    private int64 max;
-
-    internal KeyEditorChildNumberInt64 (Variant initial_value, Variant? range_content_or_null)
-    {
-        this.variant = initial_value;
-
-        this.visible = true;
-        this.hexpand = true;
-        this.secondary_icon_activatable = false;
-        this.set_icon_tooltip_text (EntryIconPosition.SECONDARY, _("This value is invalid for the key type.")); // TODO custom text, including range 1/2
-
-        this.text = initial_value.print (false);
-
-        if (range_content_or_null != null)
-        {
-            min = ((!) range_content_or_null).get_child_value (0).get_int64 ();
-            max = ((!) range_content_or_null).get_child_value (1).get_int64 ();
-        }
-        else
-        {
-            min = int64.MIN;
-            max = int64.MAX;
-        }
-
-        connect_entry ();
-    }
-
-    protected override bool test_value ()
-    {
-        Variant? tmp_variant;
-        string tmp_text = this.text; // don't put in the try{} for correct C code
-        try
-        {
-            tmp_variant = Variant.parse (VariantType.INT64, tmp_text);
-        }
-        catch (VariantParseError e)
-        {
-            show_error (true);
-            return false;
-        }
-
-        double variant_value = ((!) tmp_variant).get_int64 ();
-        if ((variant_value < min) || (variant_value > max))
-        {
-            show_error (true);
-            return false;
-        }
-        else
-        {
-            variant = (!) tmp_variant;
-            show_error (false);
-            return true;
-        }
-    }
-}
-
-private class KeyEditorChildNumberUint64 : KeyEditorChildNumberCustom
-{
-    private uint64 min;
-    private uint64 max;
-
-    internal KeyEditorChildNumberUint64 (Variant initial_value, Variant? range_content_or_null)
-    {
-        this.variant = initial_value;
-
-        this.visible = true;
-        this.hexpand = true;
-        this.secondary_icon_activatable = false;
-        this.set_icon_tooltip_text (EntryIconPosition.SECONDARY, _("This value is invalid for the key type.")); // TODO custom text, including range 2/2
-
-        this.text = initial_value.print (false);
-
-        if (range_content_or_null != null)
-        {
-            min = ((!) range_content_or_null).get_child_value (0).get_uint64 ();
-            max = ((!) range_content_or_null).get_child_value (1).get_uint64 ();
-        }
-        else
-        {
-            min = uint64.MIN;
-            max = uint64.MAX;
-        }
-
-        connect_entry ();
-    }
-
-    protected override bool test_value ()
-    {
-        Variant? tmp_variant;
-        string tmp_text = this.text; // don't put in the try{} for correct C code
-        try
-        {
-            tmp_variant = Variant.parse (VariantType.UINT64, tmp_text);
-        }
-        catch (VariantParseError e)
-        {
-            show_error (true);
-            return false;
-        }
-
-        double variant_value = ((!) tmp_variant).get_uint64 ();
-        if ((variant_value < min) || (variant_value > max))
-        {
-            show_error (true);
-            return false;
-        }
-        else
-        {
-            variant = (!) tmp_variant;
-            show_error (false);
-            return true;
-        }
-    }
-}
-
-private class KeyEditorChildNumberInt : SpinButton, KeyEditorChild
-{
-    private string key_type;
-
-    private ulong deleted_text_handler = 0;
-    private ulong inserted_text_handler = 0;
-
-    internal KeyEditorChildNumberInt (Variant initial_value, string type_string, Variant? range_content_or_null)
-        requires (type_string == "y" || type_string == "n" || type_string == "q" || type_string == "i" || type_string == "u" || type_string == "h")     // TODO type_string == "x" || type_string == "t" ||
-    {
-        this.key_type = type_string;
-
-        this.visible = true;
-        this.hexpand = true;
-        this.halign = Align.START;
-
-        double min, max;
-        if (range_content_or_null != null)
-        {
-            min = get_variant_as_double (((!) range_content_or_null).get_child_value (0));
-            max = get_variant_as_double (((!) range_content_or_null).get_child_value (1));
-        }
-        else
-            get_min_and_max_double (out min, out max, type_string);
-
-        Adjustment adjustment = new Adjustment (get_variant_as_double (initial_value), min, max, 1.0, 5.0, 0.0);
-        this.configure (adjustment, 1.0, 0);
-
-        this.update_policy = SpinButtonUpdatePolicy.IF_VALID;
-        this.snap_to_ticks = true;
-        this.numeric = true;
-        this.input_purpose = InputPurpose.NUMBER;   // TODO could be DIGITS for UnsignedInt
-        this.width_chars = 30;
-
-        EntryBuffer ref_buffer = buffer;    // an EntryBuffer doesn't emit a "destroy" signal
-        deleted_text_handler = ref_buffer.deleted_text.connect (() => value_has_changed ());
-        inserted_text_handler = ref_buffer.inserted_text.connect (() => value_has_changed ());
-        ulong entry_activate_handler = activate.connect (() => { update (); child_activated (); });
-
-        destroy.connect (() => {
-                ref_buffer.disconnect (deleted_text_handler);
-                ref_buffer.disconnect (inserted_text_handler);
-                disconnect (entry_activate_handler);
-            });
-    }
-
-    private static void get_min_and_max_double (out double min, out double max, string variant_type)
-    {
-        switch (variant_type)
-        {
-            case "y": min = (double) uint8.MIN;     max = (double) uint8.MAX;   break;
-            case "n": min = (double) int16.MIN;     max = (double) int16.MAX;   break;
-            case "q": min = (double) uint16.MIN;    max = (double) uint16.MAX;  break;
-            case "i": min = (double) int32.MIN;     max = (double) int32.MAX;   break;
-            case "u": min = (double) uint32.MIN;    max = (double) uint32.MAX;  break;
-            case "h": min = (double) int32.MIN;     max = (double) int32.MAX;   break;
-            default: assert_not_reached ();
-        }
-    }
-
-    private static double get_variant_as_double (Variant variant)
-    {
-        switch (variant.classify ())
-        {
-            case Variant.Class.BYTE:    return (double) variant.get_byte ();
-            case Variant.Class.INT16:   return (double) variant.get_int16 ();
-            case Variant.Class.UINT16:  return (double) variant.get_uint16 ();
-            case Variant.Class.INT32:   return (double) variant.get_int32 ();
-            case Variant.Class.UINT32:  return (double) variant.get_uint32 ();
-            case Variant.Class.HANDLE:  return (double) variant.get_handle ();
-            default: assert_not_reached ();
-        }
-    }
-
-    internal Variant get_variant ()   // TODO test_value against range
-    {
-        switch (key_type)
-        {
-            case "y": return new Variant.byte   ((uint8)  get_int64_from_entry ());
-            case "n": return new Variant.int16  ((int16)  get_int64_from_entry ());
-            case "q": return new Variant.uint16 ((uint16) get_int64_from_entry ());
-            case "i": return new Variant.int32  ((int32)  get_int64_from_entry ());
-            case "u": return new Variant.uint32 ((uint32) get_int64_from_entry ()); // TODO also use get_value_as_int?
-            case "h": return new Variant.handle ((int32)  get_int64_from_entry ());
-            default: assert_not_reached ();
-        }
-    }
-    private int64 get_int64_from_entry ()
-    {
-        return int64.parse (this.get_text ());
-    }
-
-    private void set_lock (bool state)
-        requires (deleted_text_handler != 0 && inserted_text_handler != 0)
-    {
-        if (state)
-        {
-            SignalHandler.block (buffer, deleted_text_handler);
-            SignalHandler.block (buffer, inserted_text_handler);
-        }
-        else
-        {
-            SignalHandler.unblock (buffer, deleted_text_handler);
-            SignalHandler.unblock (buffer, inserted_text_handler);
-        }
-    }
-
-    internal void reload (Variant gvariant)       // TODO "key_editor_child_number_int_real_reload: assertion 'gvariant != NULL' failed" two times when ghosting a key
-    {
-        set_lock (true);
-        this.set_value (get_variant_as_double (gvariant));
-        set_lock (false);
-    }
-}
-
-private class KeyEditorChildArray : Grid, KeyEditorChild
-{
-    private TextView text_view;
-    private Revealer error_revealer;
-    private string key_type;
-    private Variant variant;
-
-    private ulong deleted_text_handler = 0;
-    private ulong inserted_text_handler = 0;
-
-    construct
-    {
-        get_style_context ().add_class ("key-editor-child-array");
-    }
-
-    internal KeyEditorChildArray (string type_string, Variant initial_value)
-    {
-        this.visible = true;
-        this.hexpand = true;
-        this.vexpand = false;
-        orientation = Orientation.VERTICAL;
-        get_style_context ().add_class ("frame");
-
-        this.key_type = type_string;
-        this.variant = initial_value;
-
-        ScrolledWindow scrolled_window = new ScrolledWindow (null, null);
-        scrolled_window.visible = true;
-
-        text_view = new TextView ();
-        text_view.visible = true;
-        text_view.expand = true;
-        text_view.wrap_mode = WrapMode.WORD;
-        text_view.monospace = true;
-        text_view.key_press_event.connect (on_key_press_event);
-        // https://bugzilla.gnome.org/show_bug.cgi?id=789676
-        text_view.button_press_event.connect_after (event_stop);
-        text_view.button_release_event.connect_after (event_stop);
-
-        scrolled_window.add (text_view);
-        add (scrolled_window);
-
-        error_revealer = new Revealer ();
-        error_revealer.visible = true;
-        error_revealer.transition_type = RevealerTransitionType.SLIDE_UP;
-        error_revealer.reveal_child = false;
-        add (error_revealer);
-
-        ActionBar error_bar = new ActionBar ();
-        error_bar.visible = true;
-        error_revealer.add (error_bar);
-
-        Image error_icon = new Image.from_icon_name ("dialog-error-symbolic", IconSize.BUTTON);
-        error_icon.visible = true;
-        error_bar.pack_start (error_icon);
-
-        Label error_label = new Label (_("This value is invalid for the key type."));
-        error_label.visible = true;
-        error_bar.pack_start (error_label);
-
-        text_view.buffer.text = initial_value.print (false);
-
-        TextBuffer ref_buffer = text_view.buffer;    // an TextBuffer doesn't emit a "destroy" signal
-        deleted_text_handler = ref_buffer.delete_range.connect_after (() => value_has_changed (test_value ()));
-        inserted_text_handler = ref_buffer.insert_text.connect_after (() => value_has_changed (test_value ()));
-        destroy.connect (() => {
-                ref_buffer.disconnect (deleted_text_handler);
-                ref_buffer.disconnect (inserted_text_handler);
-            });
-    }
-    private bool on_key_press_event (Gdk.EventKey event)
-    {
-        string keyval_name = (!) (Gdk.keyval_name (event.keyval) ?? "");
-        if ((keyval_name == "Return" || keyval_name == "KP_Enter")
-        && ((event.state & Gdk.ModifierType.MODIFIER_MASK) == 0)
-        && (test_value ()))
-        {
-            child_activated ();
-            return Gdk.EVENT_STOP;
-        }
-        return base.key_press_event (event);
-    }
-    private static bool event_stop ()
-    {
-        return Gdk.EVENT_STOP;
-    }
-
-    private bool test_value ()
-    {
-        string tmp_text = text_view.buffer.text; // don't put in the try{} for correct C code
-        try
-        {
-            Variant? tmp_variant = Variant.parse (new VariantType (key_type), tmp_text);
-            variant = (!) tmp_variant;
-
-            StyleContext context = get_style_context ();
-            if (context.has_class ("error"))
-                context.remove_class ("error");
-            error_revealer.reveal_child = false;
-
-            return true;
-        }
-        catch (VariantParseError e)
-        {
-            StyleContext context = get_style_context ();
-            if (!context.has_class ("error"))
-                context.add_class ("error");
-            error_revealer.reveal_child = true;
-
-            return false;
-        }
-    }
-
-    internal Variant get_variant ()
-    {
-        return variant;
-    }
-
-    private void set_lock (bool state)
-        requires (deleted_text_handler != 0 && inserted_text_handler != 0)
-    {
-        if (state)
-        {
-            SignalHandler.block (text_view.buffer, deleted_text_handler);
-            SignalHandler.block (text_view.buffer, inserted_text_handler);
-        }
-        else
-        {
-            SignalHandler.unblock (text_view.buffer, deleted_text_handler);
-            SignalHandler.unblock (text_view.buffer, inserted_text_handler);
-        }
-    }
-
-    internal void reload (Variant gvariant)
-    {
-        set_lock (true);
-        text_view.buffer.text = gvariant.print (false);
-        if (!test_value ())
+        if (modifications_handler.get_current_delay_mode ())
             assert_not_reached ();
-        set_lock (false);
-    }
-}
 
-private class KeyEditorChildDefault : Entry, KeyEditorChild
-{
-    private string key_type;
-    private Variant variant;
-    private bool is_string;
+        string full_name;
+        uint16 context_id;
+        bool key_value_request;
+        bool key_default_value;
+        ((!) value_variant).@get ("(sqbb)", out full_name, out context_id, out key_value_request, out key_default_value);
 
-    private ulong deleted_text_handler = 0;
-    private ulong inserted_text_handler = 0;
-
-    construct
-    {
-        get_style_context ().add_class ("key-editor-child-entry");
-    }
-
-    internal KeyEditorChildDefault (string type_string, Variant initial_value)
-    {
-        this.key_type = type_string;
-        this.variant = initial_value;
-
-        this.visible = true;
-        this.hexpand = true;
-        this.secondary_icon_activatable = false;
-        this.set_icon_tooltip_text (EntryIconPosition.SECONDARY, _("This value is invalid for the key type."));
-
-        this.is_string = type_string == "s" || type_string == "o" || type_string == "g";
-        this.text = is_string ? initial_value.get_string () : initial_value.print (false);
-
-        EntryBuffer ref_buffer = buffer;    // an EntryBuffer doesn't emit a "destroy" signal
-        deleted_text_handler = ref_buffer.deleted_text.connect (() => value_has_changed (test_value ()));
-        inserted_text_handler = ref_buffer.inserted_text.connect (() => value_has_changed (test_value ()));
-        ulong entry_activate_handler = activate.connect (() => { if (test_value ()) child_activated (); });
-
-        destroy.connect (() => {
-                ref_buffer.disconnect (deleted_text_handler);
-                ref_buffer.disconnect (inserted_text_handler);
-                disconnect (entry_activate_handler);
-            });
-    }
-
-    private bool test_value ()
-    {
-        if (key_type == "s")
-        {
-            variant = new Variant.string (this.text);
-            return true;
-        }
-
-        string tmp_text = is_string ? @"'$text'" : this.text; // don't put in the try{} for correct C code
-        try
-        {
-            Variant? tmp_variant = Variant.parse (new VariantType (key_type), tmp_text);
-            variant = (!) tmp_variant;
-
-            StyleContext context = get_style_context ();
-            if (context.has_class ("error"))
-                context.remove_class ("error");
-            set_icon_from_icon_name (EntryIconPosition.SECONDARY, null);
-
-            return true;
-        }
-        catch (VariantParseError e)
-        {
-            StyleContext context = get_style_context ();
-            if (!context.has_class ("error"))
-                context.add_class ("error");
-            secondary_icon_name = "dialog-error-symbolic";
-
-            return false;
-        }
-    }
-
-    internal Variant get_variant ()
-    {
-        return variant;
-    }
-
-    private void set_lock (bool state)
-        requires (deleted_text_handler != 0 && inserted_text_handler != 0)
-    {
-        if (state)
-        {
-            SignalHandler.block (buffer, deleted_text_handler);
-            SignalHandler.block (buffer, inserted_text_handler);
-        }
+        if (key_value_request == key_default_value)
+            modifications_handler.set_to_default (full_name, context_id);
         else
-        {
-            SignalHandler.unblock (buffer, deleted_text_handler);
-            SignalHandler.unblock (buffer, inserted_text_handler);
-        }
+            modifications_handler.set_gsettings_key_value (full_name, context_id, new Variant.boolean (key_value_request));
     }
 
-    internal void reload (Variant gvariant)
+    /*\
+    * * modifications
+    \*/
+
+    [CCode (notify = false)] internal bool in_window_modifications           { internal get; private set; default = false; }
+
+    private bool modifications_list_created = false;
+    private ModificationsList modifications_list;
+
+    private void create_modifications_list ()
     {
-        set_lock (true);
-        this.text = is_string ? gvariant.get_string () : gvariant.print (false);
-        if (!test_value ())
+        modifications_list = new ModificationsList (/* needs shadows   */ false,
+                                                    /* big placeholder */ true);
+        modifications_list.set_window_size (saved_window_size);
+        // modifications_list.selection_changed.connect (() => ...);
+        modifications_list.show ();
+        add (modifications_list);
+        modifications_list_created = true;
+    }
+
+    internal void show_modifications_view ()
+        requires (modifications_list_created == true)
+    {
+        if (in_window_bookmarks || in_window_about)
+            show_default_view ();
+
+        modifications_list.reset ();
+
+        set_visible_child (modifications_list);
+        in_window_modifications = true;
+    }
+
+    private void update_in_window_modifications ()
+    {
+        if (!modifications_list_created)
+            create_modifications_list ();
+
+        GLib.ListStore modifications_liststore = modifications_handler.get_delayed_settings ();
+        modifications_list.bind_model (modifications_liststore, delayed_setting_row_create);
+
+        if (in_window_modifications && modifications_handler.mode == ModificationsMode.NONE)
+            show_default_view ();
+    }
+
+    private Widget delayed_setting_row_create (Object object)
+    {
+        SimpleSettingObject sso = (SimpleSettingObject) object;
+        return ModificationsRevealer.create_delayed_setting_row (modifications_handler, sso.name, sso.full_name, sso.context_id);
+    }
+
+    /*\
+    * * views
+    \*/
+
+    internal override void set_path (ViewType type, string path)
+    {
+        dconf_content.set_path (type, path);
+        modifications_handler.path_changed ();
+        invalidate_popovers ();
+    }
+
+    /*\
+    * * reload
+    \*/
+
+    internal void set_search_parameters (bool local_search, string current_path, string [] bookmarks)
+    {
+        hide_reload_warning ();
+        dconf_content.set_search_parameters (local_search, current_path, last_context_id, bookmarks, sorting_options);
+    }
+
+    internal bool check_reload (ViewType type, string path, bool show_infobar)
+    {
+        SettingsModel model = modifications_handler.model;
+
+        if (type == ViewType.FOLDER || (type == ViewType.CONFIG && ModelUtils.is_folder_path (path)))
+        {
+            if (!dconf_content.check_reload_folder (model.get_children (path)))
+                return false;
+            if (show_infobar)
+            {
+                info_bar.show_warning ("hard-reload-folder");
+                return false;
+            }
+        }
+        else if (type == ViewType.OBJECT || type == ViewType.CONFIG)
+        {
+            if (model.key_exists (path, last_context_id))
+            {
+                RegistryVariantDict properties = new RegistryVariantDict.from_aqv (model.get_key_properties (path, last_context_id, (uint16) PropertyQuery.HASH));
+                uint properties_hash;
+                if (!properties.lookup (PropertyQuery.HASH, "u", out properties_hash))
+                    assert_not_reached ();
+                if (!dconf_content.check_reload_object (properties_hash))
+                    return false;
+            }
+            if (show_infobar)
+            {
+                info_bar.show_warning ("hard-reload-object");
+                return false;
+            }
+        }
+        else if (type == ViewType.SEARCH)
             assert_not_reached ();
-        set_lock (false);
+        else
+            assert_not_reached ();
+        return true;
+    }
+
+    /*\
+    * * Proxy calls
+    \*/
+
+    internal void hide_or_show_toggles (bool show) { dconf_content.hide_or_show_toggles (show); }
+
+    // keyboard
+    internal override bool next_match ()
+    {
+        if (in_window_modifications)
+            return modifications_list.next_match ();
+        return base.next_match ();
+    }
+
+    internal override bool previous_match ()
+    {
+        if (in_window_modifications)
+            return modifications_list.previous_match ();
+        return base.previous_match ();
+    }
+
+    internal void toggle_boolean_key ()      { dconf_content.toggle_boolean_key ();      }
+    internal void set_selected_to_default () { dconf_content.set_selected_to_default (); }
+
+    // current row property
+    internal override bool handle_copy_text (out string copy_text)
+    {
+        if (in_window_modifications)
+            return modifications_list.handle_copy_text (out copy_text);
+        return base.handle_copy_text (out copy_text);
+    }
+
+    // values changes
+    internal void gkey_value_push (string full_name, uint16 context_id, Variant key_value, bool is_key_default)
+    {
+        dconf_content.gkey_value_push (full_name, context_id, key_value, is_key_default);
+    }
+    internal void dkey_value_push (string full_name, Variant? key_value_or_null)
+    {
+        dconf_content.dkey_value_push (full_name, key_value_or_null);
     }
 }

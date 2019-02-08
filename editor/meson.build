@@ -66,20 +66,42 @@ install_data(
 )
 
 sources = files(
+  'about-list.vala',
+  'adaptative-pathbar.vala',
+  'adaptative-window.vala',
+  'base-headerbar.vala',
+  'base-view.vala',
+  'base-window.vala',
   'bookmarks.vala',
+  'bookmarks-controller.vala',
+  'bookmarks-headerbar.vala',
+  'bookmarks-list.vala',
+  'bookmarks-view.vala',
+  'bookmarks-window.vala',
+  'browser-content.vala',
+  'browser-headerbar.vala',
   'browser-infobar.vala',
   'browser-stack.vala',
   'browser-view.vala',
+  'browser-window.vala',
   'dconf-editor.vala',
+  'dconf-headerbar.vala',
   'dconf-model.vala',
   'dconf-view.vala',
   'dconf-window.vala',
   'delayed-setting-view.vala',
+  'key-editor-child.vala',
   'key-list-box-row.vala',
+  'large-pathbar.vala',
   'model-utils.vala',
   'modifications-handler.vala',
+  'modifications-list.vala',
   'modifications-revealer.vala',
-  'pathbar.vala',
+  'night-light-monitor.vala',
+  'notifications-revealer.vala',
+  'overlayed-list.vala',
+  'pathentry.vala',
+  'pathwidget.vala',
   'registry-info.vala',
   'registry-list.vala',
   'registry-placeholder.vala',
@@ -87,30 +109,48 @@ sources = files(
   'registry-view.vala',
   'schemas-utility.vala',
   'setting-object.vala',
+  'short-pathbar.vala',
   'source-manager.vala'
 )
 
-resource_data = files(
+css_data = files(
+  'base-window.css',
+  'dconf-editor.css',
+  'large-pathbar.css'
+)
+
+ui_data = files(
+  'adaptative-window.ui',
+  'base-headerbar.ui',
+  'base-view.ui',
+  'base-window.ui',
   'bookmarks.ui',
+  'bookmarks-controller.ui',
   'bookmark.ui',
   'browser-infobar.ui',
   'browser-stack.ui',
-  'browser-view.ui',
-  'dconf-editor.css',
-  'dconf-editor-menu.ui',
-  'dconf-editor.ui',
   'delayed-setting-view.ui',
+  'filter-list-box-row.ui',
   'folder-list-box-row.ui',
   'help-overlay.ui',
   'key-list-box-row.ui',
+  'large-pathbar-item.ui',
+  'large-pathbar.ui',
   'modifications-revealer.ui',
-  'pathbar-item.ui',
-  'pathbar.ui',
+  'notifications-revealer.ui',
+  'overlayed-list.ui',
+  'pathentry.ui',
+  'pathwidget.ui',
   'property-row.ui',
   'registry-info.ui',
+  'registry-list.ui',
   'registry-placeholder.ui',
-  'registry-view.ui'
+  'return-list-box-row.ui',
+  'search-list-box-row.ui',
+  'short-pathbar.ui'
 )
+
+resource_data = css_data + ui_data
 
 sources += gnome.compile_resources(
   'resources',
@@ -121,7 +161,7 @@ sources += gnome.compile_resources(
 
 deps = [
   dependency('dconf', version: '>= 0.26.1'),
-  dependency('glib-2.0', version: '>= 2.55.1'),
+  dependency('glib-2.0', version: '>= 2.56.0'),
   dependency('gmodule-2.0'),
   dependency('gtk+-3.0', version: '>= 3.22.27'),
   valac.find_library('config', dirs: meson.current_source_dir()),
