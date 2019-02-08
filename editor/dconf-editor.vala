@@ -15,11 +15,17 @@
   along with Dconf Editor.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-private class ConfigurationEditor : Gtk.Application
+private class ConfigurationEditor : Gtk.Application, BaseApplication
 {
+    /* Translators: application name, as used in the window manager, the window title, the about dialog... */
+    internal const string PROGRAM_NAME = _("dconf Editor");
+
     internal static string [,] internal_mappings = {
             {"ca.desrt.dconf-editor.Bookmarks",
                 "/ca/desrt/dconf-editor/"},
+            {"ca.desrt.dconf-editor.NightLight",
+                "/ca/desrt/dconf-editor/"},
+
             {"ca.desrt.dconf-editor.Demo.EmptyRelocatable",
                 "/ca/desrt/dconf-editor/Demo/EmptyRelocatable/"}
         };
@@ -137,23 +143,28 @@ private class ConfigurationEditor : Gtk.Application
 
     private const OptionEntry [] option_entries =
     {
+        /* Translators: command-line option description, see 'dconf-editor --help' */
         { "version", 'v', 0, OptionArg.NONE, null, N_("Print release version and exit"), null },
+
+        /* Translators: command-line option description, see 'dconf-editor --help' */
         { "list-relocatable-schemas", 0, 0, OptionArg.NONE, null, N_("Print relocatable schemas and exit"), null },
 
+        /* Translators: command-line option description, see 'dconf-editor --help'; the option removes the initial "use at your own risks" dialog */
         { "I-understand-that-changing-options-can-break-applications", 0, 0, OptionArg.NONE, ref disable_warning, N_("Do not show initial warning"), null },
 
-        { OPTION_REMAINING, 0, 0, OptionArg.STRING_ARRAY, ref remaining, "args", N_("[PATH|FIXED_SCHEMA [KEY]|RELOCATABLE_SCHEMA:PATH [KEY]]") },
+        { OPTION_REMAINING, 0, 0, OptionArg.STRING_ARRAY, ref remaining, "args", null },
         {}
     };
 
     private const GLib.ActionEntry [] action_entries =
     {
         // generic
+        { "set-use-night-mode", set_use_night_mode, "b" },
         { "copy", copy_cb, "s" },   // TODO is that really the good way to do things? (see Taquin)
 
-        // app-menu
-        { "about", about_cb },
-        { "quit", quit_cb }
+        // quit
+        { "quit",           quit_if_no_pending_changes },
+        { "apply-and-quit", apply_pending_changes_and_quit }
     };
 
     /*\
@@ -175,10 +186,46 @@ private class ConfigurationEditor : Gtk.Application
     {
         Object (application_id: "ca.desrt.dconf-editor", flags: ApplicationFlags.HANDLES_COMMAND_LINE|ApplicationFlags.HANDLES_OPEN);
 
-//        TODO needs gio-2.0 >= 2.56
-//        set_option_context_parameter_string (_("..."));
-//        set_option_context_summary (_("..."));
-//        set_option_context_description (_("..."));
+        set_option_context_parameter_string ("[ PATH | [FIXED_SCHEMA|RELOC_SCHEMA:PATH] [KEY] ]");
+        /* Translators: command-line argument description, see 'dconf-editor --help'; try to put that string in 80 characters or less, if possible. */
+        set_option_context_summary (_("Graphical interface for editing other applications settings.")
+                                  + "\n\n"
+        /* Translators: command-line argument description, see 'dconf-editor --help'; try to put that string in 80 characters or less, if possible. */
+                                  + _("Uses the gsettings API of the glib library, and other ways."));
+
+        /* Translators: command-line header description, see 'dconf-editor --help' */
+        set_option_context_description (_("Arguments description:") +
+/* FIXME: PATH can only be a folder path if describing a relocatable schema */
+"\n  PATH" +
+/* Translators: command-line argument description, see 'dconf-editor --help' */
+"\n    " + _("a folder path or a key path") +
+/* Translators: command-line argument description, see 'dconf-editor --help' */
+"\n    " + _("example: “/org/gnome/” or “/ca/desrt/dconf-editor/Demo/boolean”") +
+
+"\n  FIXED_SCHEMA" +
+/* Translators: command-line argument description, see 'dconf-editor --help' */
+"\n    " + _("the name of a schema with fixed path") +
+/* Translators: command-line argument description, see 'dconf-editor --help' */
+"\n    " + _("example: “ca.desrt.dconf-editor.Settings”") +
+
+"\n  RELOC_SCHEMA" +
+/* Translators: command-line argument description, see 'dconf-editor --help'; no need to put your translation of "relocatable" between quotation marks, that's done in English to highlight why the option is called "RELOC_SCHEMA" */
+"\n    " + _("the name of a “relocatable” schema, without fixed path") +
+/* Translators: command-line argument description, see 'dconf-editor --help' */
+"\n    " + _("see list with the “--list-relocatable-schemas” option") +
+
+"\n  MAPPING" +
+/* Translators: command-line argument description, see 'dconf-editor --help' */
+"\n    " + _("the path where to map the relocatable schema") +
+/* Translators: command-line argument description, see 'dconf-editor --help' */
+"\n    " + _("example: “ca.desrt.dconf-editor.Bookmarks:/ca/desrt/dconf-editor/”") +
+
+"\n  KEY" +
+/* Translators: command-line argument description, see 'dconf-editor --help' */
+"\n    " + _("the name of a key from the schema") +
+/* Translators: command-line argument description, see 'dconf-editor --help' */
+"\n    " + _("example: “bookmarks”") +
+"\n");
 
         add_main_option_entries (option_entries);
     }
@@ -232,29 +279,35 @@ private class ConfigurationEditor : Gtk.Application
 
             if (known_schemas_installed.length > 0)
             {
+                /* Translators: command-line text, if --list-relocatable-schemas is given; introduces a list of schemas ids */
                 stdout.printf (_("Known schemas installed:") + "\n");
                 foreach (string schema_id in known_schemas_installed)
                     stdout.printf (@"  $schema_id\n");
             }
             else
+                /* Translators: command-line text, if --list-relocatable-schemas is given */
                 stdout.printf (_("No known schemas installed.") + "\n");
             stdout.printf ("\n");
             if (known_schemas_skipped.length > 0)
             {
+                /* Translators: command-line text, if --list-relocatable-schemas is given; introduces a list of schemas ids */
                 stdout.printf (_("Known schemas skipped:") + "\n");
                 foreach (string schema_id in known_schemas_skipped)
                     stdout.printf (@"  $schema_id\n");
             }
             else
+                /* Translators: command-line text, if --list-relocatable-schemas is given */
                 stdout.printf (_("No known schemas skipped.") + "\n");
             stdout.printf ("\n");
             if (unknown_schemas.length > 0)
             {
+                /* Translators: command-line text, if --list-relocatable-schemas is given; introduces a list of schemas ids */
                 stdout.printf (_("Unknown schemas:") + "\n");
                 foreach (string schema_id in unknown_schemas)
                     stdout.printf (@"  $schema_id\n");
             }
             else
+                /* Translators: command-line text, if --list-relocatable-schemas is given */
                 stdout.printf (_("No unknown schemas.") + "\n");
             return Posix.EXIT_SUCCESS;
         }
@@ -265,11 +318,54 @@ private class ConfigurationEditor : Gtk.Application
     {
         base.startup ();
 
-        Environment.set_application_name (_("dconf Editor"));
+        Environment.set_application_name (PROGRAM_NAME);
         Gtk.Window.set_default_icon_name ("ca.desrt.dconf-editor");
 
         add_action_entries (action_entries, this);
-        set_accels_for_action ("ui.copy-path", { "<Primary><Shift>c" });
+        set_accels_for_action ("bw.toggle-bookmark",        {        "<Primary>b",
+                                                              "<Shift><Primary>b"       });
+        set_accels_for_action ("base.copy",                 {        "<Primary>c"       });
+        set_accels_for_action ("base.copy-alt",             { "<Shift><Primary>c"       });
+        set_accels_for_action ("bw.bookmark",               {        "<Primary>d"       });
+        set_accels_for_action ("bw.unbookmark",             { "<Shift><Primary>d"       });
+        set_accels_for_action ("key.search-global(false)",  {        "<Primary>f"       });
+        set_accels_for_action ("key.search-local(false)",   { "<Shift><Primary>f"       });
+        set_accels_for_action ("key.search-global(true)",   {        "<Primary><Alt>f"  });
+        set_accels_for_action ("key.search-local(true)",    { "<Shift><Primary><Alt>f"  });
+        set_accels_for_action ("key.next-match",            {        "<Primary>g"       });
+        set_accels_for_action ("key.previous-match",        { "<Shift><Primary>g"       });
+     // set_accels_for_action ("key.toggle-config",         {        "<Primary>i"       });   // <Shift><Primary>i is gtk editor
+        set_accels_for_action ("kbd.modifications",         {        "<Alt>i"           });
+        set_accels_for_action ("key.edit-path-end",         {        "<Primary>l"       });
+        set_accels_for_action ("key.edit-path-last",        { "<Shift><Primary>l"       });
+        set_accels_for_action ("app.quit",                  {        "<Primary>q"       });
+        set_accels_for_action ("app.apply-and-quit",        { "<Shift><Primary>q"       });
+        set_accels_for_action ("base.paste",                {        "<Primary>v"       });   // https://bugzilla.gnome.org/show_bug.cgi?id=762257 is WONTFIX
+        set_accels_for_action ("base.paste-alt",            { "<Shift><Primary>v"       });
+
+        set_accels_for_action ("key.open-root",             { "<Shift><Alt>Up"          });
+        set_accels_for_action ("key.open-parent",           {        "<Alt>Up"          });
+        set_accels_for_action ("key.open-child",            {        "<Alt>Down"        });
+        set_accels_for_action ("key.open-last-child",       { "<Shift><Alt>Down"        });
+
+        set_accels_for_action ("base.escape",               {          "Escape"         });
+        set_accels_for_action ("base.toggle-hamburger",     {          "F10"            });
+        set_accels_for_action ("base.menu",                 {          "Menu"           });
+
+        set_accels_for_action ("kbd.set-to-default",        { "<Primary>Delete",
+                                                              "<Primary>KP_Delete",
+                                                              "<Primary>decimalpoint",
+                                                              "<Primary>period",
+                                                              "<Primary>KP_Decimal"     }); // TODO "BackSpace"?
+        set_accels_for_action ("kbd.toggle-boolean",        { "<Primary>Return",
+                                                              "<Primary>KP_Enter"       });
+
+     // set_accels_for_action ("app.about",                 { "<Shift><Primary>F1"      }); // TODO bug: needs a dance in the window
+        set_accels_for_action ("win.show-help-overlay",     {                 "F1",
+                                                                     "<Primary>question",
+                                                              "<Shift><Primary>question"}); // "<Primary>F1" is automatically done
+
+        init_night_mode ();
 
         Gtk.CssProvider css_provider = new Gtk.CssProvider ();
         css_provider.load_from_resource ("/ca/desrt/dconf-editor/ui/dconf-editor.css");
@@ -295,6 +391,23 @@ private class ConfigurationEditor : Gtk.Application
         else                                                // called by default or with GSETTINGS_BACKEND=dconf
             info (_("Looks like the DConf settings backend is used, all looks good."));
     } */
+
+    /*\
+    * * Night mode
+    \*/
+
+    NightLightMonitor night_light_monitor;  // keep it here or it is unrefed
+
+    private void init_night_mode ()
+    {
+        night_light_monitor = new NightLightMonitor ("/ca/desrt/dconf-editor/");
+    }
+
+    private void set_use_night_mode (SimpleAction action, Variant? gvariant)
+        requires (gvariant != null)
+    {
+        night_light_monitor.set_use_night_mode (((!) gvariant).get_boolean ());
+    }
 
     /*\
     * * Window activation
@@ -328,6 +441,7 @@ private class ConfigurationEditor : Gtk.Application
         Gtk.Window? test_window = get_active_window ();
         if (test_window != null)
         {
+            /* Translators: command-line error message, when the user requests a specific path while there is already a window opened */
             commands.print (_("Only one window can be opened for now.\n"));
             ((!) test_window).present ();
             return Posix.EXIT_FAILURE;
@@ -347,6 +461,7 @@ private class ConfigurationEditor : Gtk.Application
 
         if (args.length > 2)
         {
+            /* Translators: command-line error message, try 'dconf-editor a b c d' */
             commands.print (_("Cannot understand: too many arguments.\n"));
             simple_activation ();
             return Posix.EXIT_FAILURE;
@@ -360,6 +475,7 @@ private class ConfigurationEditor : Gtk.Application
             Gtk.Window window = get_new_window (null, arg0, null);
             if (args.length == 2)
             {
+                /* Translators: command-line error message, try 'dconf-editor / a' */
                 commands.print (_("Cannot understand second argument in this context.\n"));
                 window.present ();
                 return Posix.EXIT_FAILURE;
@@ -380,6 +496,7 @@ private class ConfigurationEditor : Gtk.Application
                 return failure_space (commands);
             if ("/" in (!) key_name)
             {
+                /* Translators: command-line error message, try 'dconf-editor org.example /' */
                 commands.print (_("Cannot understand: slash character in second argument.\n"));
                 simple_activation ();
                 return Posix.EXIT_FAILURE;
@@ -394,6 +511,7 @@ private class ConfigurationEditor : Gtk.Application
             path = test_format [1];
             if (!((!) path).has_prefix ("/") || !((!) path).has_suffix ("/"))
             {
+                /* Translators: command-line error message, try 'dconf-editor org.example:a' */
                 commands.print (_("Schema path should start and end with a “/”.\n"));
                 simple_activation ();
                 return Posix.EXIT_FAILURE;
@@ -409,13 +527,15 @@ private class ConfigurationEditor : Gtk.Application
 
     private int failure_double_slash (ApplicationCommandLine commands)
     {
-        commands.print ("Cannot understand: given path contains “//”.\n");  // should be translated, but nobody cares, so let's not lose time for a freeze break here
+        /* Translators: command-line error message, try 'dconf-editor //' */
+        commands.print (_("Cannot understand: given path contains “//”.\n"));
         simple_activation ();
         return Posix.EXIT_FAILURE;
     }
 
     private int failure_space (ApplicationCommandLine commands)
     {
+        /* Translators: command-line error message, try 'dconf-editor "org example" a' */
         commands.print (_("Cannot understand: space character in argument.\n"));
         simple_activation ();
         return Posix.EXIT_FAILURE;
@@ -431,8 +551,9 @@ private class ConfigurationEditor : Gtk.Application
 
     private Gtk.Window get_new_window (string? schema, string? path, string? key_name)
     {
-        DConfWindow window = new DConfWindow (disable_warning, schema, path, key_name);
+        DConfWindow window = new DConfWindow (disable_warning, schema, path, key_name, night_light_monitor);
         add_window (window);
+
         return (Gtk.Window) window;
     }
 
@@ -440,8 +561,10 @@ private class ConfigurationEditor : Gtk.Application
     * * Copy action
     \*/
 
-    private Notification notification = new Notification (_("Copied to clipboard"));
     private uint notification_number = 0;
+
+    /* Translators: notification header, try ctrl-c while in the keys list */
+    private Notification notification = new Notification (_("Copied to clipboard"));
 
     private void copy_cb (SimpleAction action, Variant? gvariant)
         requires (gvariant != null)
@@ -486,32 +609,57 @@ private class ConfigurationEditor : Gtk.Application
     * * App-menu callbacks
     \*/
 
-    internal void about_cb ()
+    private void quit_if_no_pending_changes ()
     {
-        string [] authors = { "Robert Ancell", "Arnaud Bonatti" };
         Gtk.Window? window = get_active_window ();
-        if (window == null)
-            return;
-        Gtk.show_about_dialog ((!) window,
-                               "program-name", _("dconf Editor"),
-                               "version", Config.VERSION,
-                               "comments", _("A graphical viewer and editor of applications’ internal settings."),
-                               "copyright", _("Copyright \xc2\xa9 2010-2014 – Canonical Ltd\nCopyright \xc2\xa9 2015-2018 – Arnaud Bonatti\nCopyright \xc2\xa9 2017-2018 – Davi da Silva Böger"),
-                               "license-type", Gtk.License.GPL_3_0, /* means "version 3.0 or later" */
-                               "wrap-license", true,
-                               "authors", authors,
-                               "translator-credits", _("translator-credits"),
-                               "logo-icon-name", "ca.desrt.dconf-editor",
-                               "website", "https://wiki.gnome.org/Apps/DconfEditor",
-                               null);
+        if (window == null || ((DConfWindow) (!) window).quit_if_no_pending_changes ())
+            base.quit ();
     }
 
-    private void quit_cb ()
+    private void apply_pending_changes_and_quit ()
     {
         Gtk.Window? window = get_active_window ();
         if (window != null)
-            ((!) window).destroy ();
-
+            ((DConfWindow) (!) window).apply_pending_changes_and_quit ();
         base.quit ();
+    }
+
+    /*\
+    * * about dialog infos
+    \*/
+
+    internal void get_about_dialog_infos (out string [] artists,
+                                          out string [] authors,
+                                          out string    comments,
+                                          out string    copyright,
+                                          out string [] documenters,
+                                          out string    logo_icon_name,
+                                          out string    program_name,
+                                          out string    translator_credits,
+                                          out string    version,
+                                          out string    website,
+                                          out string    website_label)
+    {
+        /* Translators: about dialog text */
+        comments = _("A graphical viewer and editor of applications’ internal settings.");
+
+        artists = {};
+        authors = { "Robert Ancell", "Arnaud Bonatti" };
+
+        /* Translators: about dialog text */
+        copyright = _("Copyright \xc2\xa9 2010-2014 – Canonical Ltd\nCopyright \xc2\xa9 2017-2018 – Davi da Silva Böger\nCopyright \xc2\xa9 2015-2019 – Arnaud Bonatti");
+
+        documenters = {};
+        logo_icon_name = "ca.desrt.dconf-editor";
+        program_name = ConfigurationEditor.PROGRAM_NAME;
+
+        /* Translators: about dialog text; this string should be replaced by a text crediting yourselves and your translation team, or should be left empty. Do not translate literally! */
+        translator_credits = _("translator-credits");
+
+        version = Config.VERSION;
+        website = "https://wiki.gnome.org/Apps/DconfEditor";
+
+        /* Translators: about dialog text; label of the website link */
+        website_label = _("Page on GNOME wiki");
     }
 }

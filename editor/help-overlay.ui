@@ -1,10 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  This file is part of Dconf Editor
+
+  Dconf Editor is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  Dconf Editor is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with Dconf Editor.  If not, see <https://www.gnu.org/licenses/>.
+-->
 <interface domain="dconf-editor">
+  <requires lib="gtk+" version="3.12"/>
   <object class="GtkShortcutsWindow" id="help_overlay">
     <child>
       <object class="GtkShortcutsSection">
         <property name="visible">True</property>
-        <property name="max-height">14</property>
+        <property name="max-height">11</property>
         <child>
           <object class="GtkShortcutsGroup">
             <property name="visible">True</property>
@@ -13,7 +30,7 @@
               <object class="GtkShortcutsShortcut">
                 <property name="visible">True</property>
                 <property name="title" translatable="yes" context="shortcut window">Bookmarks menu</property>
-                <property name="accelerator">&lt;Primary&gt;b</property>
+                <property name="accelerator">&lt;Primary&gt;b</property> <!-- &lt;Primary&gt;&lt;Shift&gt;b does the same -->
               </object>
             </child>
             <child>
@@ -33,62 +50,15 @@
             <child>
               <object class="GtkShortcutsShortcut">
                 <property name="visible">True</property>
-                <property name="title" translatable="yes" context="shortcut window">Search bar</property>
-                <property name="accelerator">&lt;Primary&gt;f</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="visible">True</property>
                 <property name="title" translatable="yes" context="shortcut window">Actions menu</property>
                 <property name="accelerator">F10</property>
               </object>
             </child>
-          </object>
-        </child>
-        <child>
-          <object class="GtkShortcutsGroup">
-            <property name="visible">True</property>
-            <property name="title" translatable="yes" context="shortcut window">Clipboard</property>
             <child>
               <object class="GtkShortcutsShortcut">
                 <property name="visible">True</property>
-                <property name="title" translatable="yes" context="shortcut window">Copy descriptor</property>
-                <property name="accelerator">&lt;Primary&gt;c</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="visible">True</property>
-                <property name="title" translatable="yes" context="shortcut window">Copy path</property>
-                <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;c</property>
-              </object>
-            </child>
-          </object>
-        </child>
-        <child>
-          <object class="GtkShortcutsGroup">
-            <property name="visible">True</property>
-            <property name="title" translatable="yes" context="shortcut window">Modifications list actions</property>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="visible">True</property>
-                <property name="title" translatable="yes" context="shortcut window">Toggle modifications list</property>
-                <property name="accelerator">&lt;Primary&gt;i</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="visible">True</property>
-                <property name="title" translatable="yes" context="shortcut window">Open selected row key</property>
-                <property name="accelerator">Return</property>
-              </object>
-            </child>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="visible">True</property>
-                <property name="title" translatable="yes" context="shortcut window">Dismiss modification</property>
-                <property name="accelerator">&lt;Primary&gt;Delete</property>
+                <property name="title" translatable="yes" context="shortcut window">Path bar menu</property>
+                <property name="accelerator">&lt;Shift&gt;F10</property>
               </object>
             </child>
           </object>
@@ -130,12 +100,113 @@
         <child>
           <object class="GtkShortcutsGroup">
             <property name="visible">True</property>
+            <property name="title" translatable="yes" context="shortcut window">Search options</property>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Toggle search</property>
+                <property name="accelerator">&lt;Primary&gt;f</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <!-- Translators: does the same thing as "Toggle search", but loads the search entry with the last searched text -->
+                <property name="title" translatable="yes" context="shortcut window">Search again</property>
+                <property name="accelerator">&lt;Primary&gt;&lt;Alt&gt;f</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Toggle local search</property>
+                <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;f</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">False</property>
+                <!-- Translators: does the same thing as "Toggle local search", but loads the search entry with the last searched text; entry hidden for now -->
+                <property name="title" translatable="yes" context="shortcut window">Search locally again</property>
+                <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;&lt;Alt&gt;f</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Paste as search</property>
+                <property name="accelerator">&lt;Primary&gt;v</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">False</property>
+                <!-- Translators: does the same thing as "Paste as search", but works even if an entry or textview is selected; entry hidden for now -->
+                <property name="title" translatable="yes" context="shortcut window">Paste as search (force)</property>
+                <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;v</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Edit path</property>
+                <property name="accelerator">&lt;Primary&gt;l</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Edit parent path</property>
+                <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;l</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Edit root path</property>
+                <property name="accelerator">slash</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Browse keys tree</property>
+                <property name="accelerator">Escape</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="GtkShortcutsGroup">
+            <property name="visible">True</property>
             <property name="title" translatable="yes" context="shortcut window">Keys list actions</property>
             <child>
               <object class="GtkShortcutsShortcut">
                 <property name="visible">True</property>
                 <property name="title" translatable="yes" context="shortcut window">Contextual menu</property>
                 <property name="accelerator">Menu</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Previous line</property>
+                <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;g</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Next line</property>
+                <property name="accelerator">&lt;Primary&gt;g</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">False</property>
+                <!-- Translators: entry disabled for now -->
+                <property name="title" translatable="yes" context="shortcut window">Toggle folder properties</property>
+                <property name="accelerator">&lt;Primary&gt;i</property>
               </object>
             </child>
             <child>
@@ -150,6 +221,33 @@
                 <property name="visible">True</property>
                 <property name="title" translatable="yes" context="shortcut window">Toggle boolean value</property>
                 <property name="accelerator">&lt;Primary&gt;Return</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="GtkShortcutsGroup">
+            <property name="visible">True</property>
+            <property name="title" translatable="yes" context="shortcut window">Modifications list actions</property>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Toggle modifications list</property>
+                <property name="accelerator">&lt;Alt&gt;i</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Open selected row key</property>
+                <property name="accelerator">Return</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Dismiss modification</property>
+                <property name="accelerator">&lt;Primary&gt;Delete</property>
               </object>
             </child>
           </object>
@@ -172,11 +270,52 @@
                 <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;F1</property>
               </object>
             </child>
+          </object>
+        </child>
+        <child>
+          <object class="GtkShortcutsGroup">
+            <property name="visible">True</property>
+            <property name="title" translatable="yes" context="shortcut window">Clipboard</property>
             <child>
-              <object class="GtkShortcutsShortcut"> <!-- TODO doesn't quit if a KeyEditor dialog is opened -->
+              <object class="GtkShortcutsShortcut">
                 <property name="visible">True</property>
-                <property name="title" translatable="yes" context="shortcut window">Quit</property>
+                <property name="title" translatable="yes" context="shortcut window">Copy descriptor</property>
+                <property name="accelerator">&lt;Primary&gt;c</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut">
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Copy path</property>
+                <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;c</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="GtkShortcutsGroup">
+            <property name="visible">True</property>
+            <property name="title" translatable="yes" context="shortcut window">Quit</property>
+            <!-- TODO rething "discard and quit", as <alt>F4 has a different behaviour when a dialog is opened, and is WM-specific -->
+            <child>
+              <object class="GtkShortcutsShortcut"> <!-- TODO doesn't quit if a dialog is opened -->
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Quit if there’s no pending changes</property>
                 <property name="accelerator">&lt;Primary&gt;q</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut"> <!-- TODO doesn't quit if a dialog is opened -->
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Apply pending changes and quit</property>
+                <property name="accelerator">&lt;Primary&gt;&lt;Shift&gt;q</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkShortcutsShortcut"> <!-- TODO doesn't quit if a dialog is opened, but closes the dialog -->
+                <property name="visible">True</property>
+                <property name="title" translatable="yes" context="shortcut window">Dismiss pending changes and quit</property>
+                <property name="accelerator">&lt;Alt&gt;F4</property>
               </object>
             </child>
           </object>

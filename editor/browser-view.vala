@@ -19,54 +19,50 @@ using Gtk;
 
 private class SimpleSettingObject : Object
 {
-    public uint16 context_id        { internal get; internal construct; }
-    public string name              { internal get; internal construct; }
-    public string full_name         { internal get; internal construct; }
+    [CCode (notify = false)] public bool is_pinned           { internal get; internal construct; }
+    [CCode (notify = false)] public bool is_search           { internal get; internal construct; }
 
-    public string casefolded_name   { internal get; private construct; }
+    [CCode (notify = false)] public uint16 context_id        { internal get; internal construct; }
+    [CCode (notify = false)] public string name              { internal get; internal construct; }
+    [CCode (notify = false)] public string full_name         { internal get; internal construct; }
+
+    [CCode (notify = false)] public string casefolded_name   { internal get; private construct; }
 
     construct
     {
         casefolded_name = name.casefold ();
     }
 
-    internal SimpleSettingObject.from_base_path (uint16 _context_id, string _name, string _base_path)
+    internal SimpleSettingObject.from_base_path (uint16 _context_id, string _name, string _base_path, bool _is_search = false, bool _is_pinned = false)
     {
         string _full_name = ModelUtils.recreate_full_name (_base_path, _name, ModelUtils.is_folder_context_id (_context_id));
-        Object (context_id: _context_id, name: _name, full_name: _full_name);
+        Object (context_id: _context_id, name: _name, full_name: _full_name, is_search: _is_search, is_pinned: _is_pinned);
     }
 
-    internal SimpleSettingObject.from_full_name (uint16 _context_id, string _name, string _full_name)
+    internal SimpleSettingObject.from_full_name (uint16 _context_id, string _name, string _full_name, bool _is_search = false, bool _is_pinned = false)
     {
-        Object (context_id: _context_id, name: _name, full_name: _full_name);
+        Object (context_id: _context_id, name: _name, full_name: _full_name, is_search: _is_search, is_pinned: _is_pinned);
     }
 }
 
-[GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/browser-view.ui")]
-private class BrowserView : Grid
+private class BrowserView : BaseView, AdaptativeWidget
 {
-    internal uint16 last_context_id { get; private set; default = ModelUtils.undefined_context_id; }
+    [CCode (notify = false)] internal uint16 last_context_id { internal get; private set; default = ModelUtils.undefined_context_id; }
 
-    [GtkChild] private BrowserInfoBar info_bar;
-    [GtkChild] private BrowserStack current_child;
+    [CCode (notify = false)] public BrowserContent browser_content { private get; construct; }
 
-    private SortingOptions sorting_options;
+    protected BrowserInfoBar info_bar;
+    protected SortingOptions sorting_options;
+
     private GLib.ListStore? key_model = null;
 
-    internal bool small_keys_list_rows { set { current_child.small_keys_list_rows = value; }}
-
-    private ModificationsHandler _modifications_handler;
-    internal ModificationsHandler modifications_handler
+    protected override void set_window_size (AdaptativeWidget.WindowSize new_size)
     {
-        private get { return _modifications_handler; }
-        set {
-            _modifications_handler = value;
-            current_child.modifications_handler = value;
-            sorting_options = new SortingOptions (value.model);
-            sorting_options.notify ["case-sensitive"].connect (on_case_sensitive_changed);
-        }
+        base.set_window_size (new_size);
+        browser_content.set_window_size (new_size);
     }
-    private void on_case_sensitive_changed ()
+
+    protected void on_case_sensitive_changed ()
     {
         if (current_view != ViewType.FOLDER)
             return;
@@ -80,12 +76,30 @@ private class BrowserView : Grid
     {
         install_action_entries ();
 
+        info_bar = new BrowserInfoBar ();
+        /* Translators: text of an infobar to sort again the keys list ("refresh" only, no "reload") */
         info_bar.add_label ("soft-reload-folder", _("Sort preferences have changed. Do you want to refresh the view?"),
+
+        /* Translators: button of an infobar to sort again the keys list ("refresh" only, no "reload") */
                                                   _("Refresh"), "bro.refresh-folder");
+
+        /* Translators: text of an infobar to reload the keys list because of a new key (for example) */
         info_bar.add_label ("hard-reload-folder", _("This folder content has changed. Do you want to reload the view?"),
-                                                  _("Reload"), "ui.reload-folder");
+
+        /* Translators: button of an infobar to reload the keys list because of a new key (for example) */
+                                                  _("Reload"), "browser.reload-folder");
+
+        /* Translators: text of an infobar to reload the key properties because something has changed */
         info_bar.add_label ("hard-reload-object", _("This key’s properties have changed. Do you want to reload the view?"),
-                                                  _("Reload"), "ui.reload-object");   // TODO also for key removing?
+
+        /* Translators: button of an infobar to reload the key properties because something has changed */
+                                                  _("Reload"), "browser.reload-object");
+        // TODO use the same for key removing?
+
+        info_bar.show ();
+        main_grid.add (info_bar);
+
+        main_grid.add (browser_content);
     }
 
     /*\
@@ -101,14 +115,7 @@ private class BrowserView : Grid
 
     private const GLib.ActionEntry [] action_entries =
     {
-        { "refresh-folder", refresh_folder },
-
-        { "set-key-value",               set_key_value,                 "(sqv)"  },
-        { "set-to-default",              set_to_default,                "(sq)"   },
-        { "delay-erase",                 delay_erase,                   "s"      },  // see also ui.erase(s)
-
-        { "toggle-dconf-key-switch",     toggle_dconf_key_switch,       "(sb)"   },
-        { "toggle-gsettings-key-switch", toggle_gsettings_key_switch,   "(sqbb)" }
+        { "refresh-folder", refresh_folder }
     };
 
     private void refresh_folder (/* SimpleAction action, Variant? path_variant */)
@@ -116,73 +123,6 @@ private class BrowserView : Grid
     {
         sorting_options.sort_key_model ((!) key_model);
         hide_reload_warning ();
-    }
-
-    private void set_key_value (SimpleAction action, Variant? value_variant)
-        requires (value_variant != null)
-    {
-        string full_name;
-        uint16 context_id;
-        Variant key_value_request;
-        ((!) value_variant).@get ("(sqv)", out full_name, out context_id, out key_value_request);
-
-        if (modifications_handler.get_current_delay_mode ())
-            modifications_handler.add_delayed_setting (full_name, key_value_request, context_id);
-        else if (!ModelUtils.is_dconf_context_id (context_id))
-            modifications_handler.set_gsettings_key_value (full_name, context_id, key_value_request);
-        else
-            modifications_handler.set_dconf_key_value (full_name, key_value_request);
-    }
-
-    private void delay_erase (SimpleAction action, Variant? path_variant)
-        requires (path_variant != null)
-    {
-        string full_name_or_empty = ((!) path_variant).get_string ();
-        if (full_name_or_empty == "")
-            return;
-        modifications_handler.enter_delay_mode ();
-        modifications_handler.add_delayed_setting (full_name_or_empty, null, ModelUtils.dconf_context_id);
-    }
-
-    private void set_to_default (SimpleAction action, Variant? path_variant)
-        requires (path_variant != null)
-    {
-        string full_name;
-        uint16 context_id;
-        ((!) path_variant).@get ("(sq)", out full_name, out context_id);
-        modifications_handler.set_to_default (full_name, context_id);
-        invalidate_popovers ();
-    }
-
-    private void toggle_dconf_key_switch (SimpleAction action, Variant? value_variant)
-        requires (value_variant != null)
-    {
-        if (modifications_handler.get_current_delay_mode ())
-            assert_not_reached ();
-
-        string full_name;
-        bool key_value_request;
-        ((!) value_variant).@get ("(sb)", out full_name, out key_value_request);
-
-        modifications_handler.set_dconf_key_value (full_name, key_value_request);
-    }
-
-    private void toggle_gsettings_key_switch (SimpleAction action, Variant? value_variant)
-        requires (value_variant != null)
-    {
-        if (modifications_handler.get_current_delay_mode ())
-            assert_not_reached ();
-
-        string full_name;
-        uint16 context_id;
-        bool key_value_request;
-        bool key_default_value;
-        ((!) value_variant).@get ("(sqbb)", out full_name, out context_id, out key_value_request, out key_default_value);
-
-        if (key_value_request == key_default_value)
-            modifications_handler.set_to_default (full_name, context_id);
-        else
-            modifications_handler.set_gsettings_key_value (full_name, context_id, new Variant.boolean (key_value_request));
     }
 
     /*\
@@ -194,34 +134,37 @@ private class BrowserView : Grid
         key_model = _key_model;
         sorting_options.sort_key_model ((!) key_model);
 
-        current_child.prepare_folder_view ((!) key_model, is_ancestor);
+        browser_content.prepare_folder_view ((!) key_model, is_ancestor);
         hide_reload_warning ();
     }
 
-    internal void select_row (string selected)
-        requires (current_view != ViewType.OBJECT)
+    internal void select_row (string selected_or_empty)
+        requires (ViewType.displays_objects_list (current_view))
     {
-        current_child.select_row (selected, last_context_id);
+        if (selected_or_empty == "")
+            browser_content.select_first_row ();
+        else
+            browser_content.select_row_named (selected_or_empty, last_context_id, !is_in_in_window_mode ());
     }
 
     internal void prepare_object_view (string full_name, uint16 context_id, Variant properties, bool is_parent)
     {
-        current_child.prepare_object_view (full_name, context_id, properties, is_parent);
+        browser_content.prepare_object_view (full_name, context_id, properties, is_parent);
         hide_reload_warning ();
         last_context_id = context_id;
     }
 
-    internal void set_path (ViewType type, string path)
+    internal virtual void set_path (ViewType type, string path)
     {
-        current_child.set_path (type, path);
-        modifications_handler.path_changed ();
+        browser_content.set_path (type, path);
+        invalidate_popovers ();
     }
 
     /*\
     * * Reload
     \*/
 
-    private void hide_reload_warning ()
+    protected void hide_reload_warning ()
     {
         info_bar.hide_warning ();
     }
@@ -232,83 +175,54 @@ private class BrowserView : Grid
             info_bar.show_warning ("soft-reload-folder");
     }
 
-    internal void set_search_parameters (string current_path, string [] bookmarks)
-    {
-        hide_reload_warning ();
-        current_child.set_search_parameters (current_path, bookmarks, sorting_options);
-    }
-
-    internal bool check_reload (ViewType type, string path, bool show_infobar)
-    {
-        SettingsModel model = modifications_handler.model;
-
-        if (type == ViewType.FOLDER)
-        {
-            if (!current_child.check_reload_folder (model.get_children (path)))
-                return false;
-            if (show_infobar)
-            {
-                info_bar.show_warning ("hard-reload-folder");
-                return false;
-            }
-        }
-        else if (type == ViewType.OBJECT)
-        {
-            if (model.key_exists (path, last_context_id))
-            {
-                RegistryVariantDict properties = new RegistryVariantDict.from_aqv (model.get_key_properties (path, last_context_id, (uint16) PropertyQuery.HASH));
-                uint properties_hash;
-                if (!properties.lookup (PropertyQuery.HASH, "u", out properties_hash))
-                    assert_not_reached ();
-                if (!current_child.check_reload_object (properties_hash))
-                    return false;
-            }
-            if (show_infobar)
-            {
-                info_bar.show_warning ("hard-reload-object");
-                return false;
-            }
-        }
-        else // (type == ViewType.SEARCH)
-            assert_not_reached ();
-        return true;
-    }
-
     /*\
     * * Proxy calls
     \*/
 
-    internal ViewType current_view { get { return current_child.current_view; }}
+    internal void row_grab_focus ()
+    {
+        browser_content.row_grab_focus ();
+    }
 
-    // popovers invalidation and toggles hiding/revealing
-    internal void discard_row_popover () { current_child.discard_row_popover (); }
-    internal void invalidate_popovers () { current_child.invalidate_popovers (); }
+    [CCode (notify = false)] internal ViewType current_view { get { return browser_content.current_view; }}
 
-    internal void hide_or_show_toggles (bool show) { current_child.hide_or_show_toggles (show); }
+    // popovers invalidation
+    internal override void close_popovers () { browser_content.discard_row_popover (); }
+    internal void invalidate_popovers ()     { browser_content.invalidate_popovers (); }
 
     // keyboard
-    internal bool return_pressed ()   { return current_child.return_pressed ();   }
-    internal bool up_pressed ()       { return current_child.up_pressed ();       }
-    internal bool down_pressed ()     { return current_child.down_pressed ();     }
+    internal bool return_pressed ()   { return browser_content.return_pressed ();   }
+    internal virtual bool next_match ()
+    {
+        if (in_window_about)
+            return false;       // TODO scroll down at last line
+        else
+            return browser_content.next_match ();
+    }
+    internal virtual bool previous_match ()
+    {
+        if (in_window_about)
+            return false;
+        else
+            return browser_content.previous_match ();
+    }
 
-    internal bool toggle_row_popover () { return current_child.toggle_row_popover (); }   // Menu
-
-    internal void toggle_boolean_key ()      { current_child.toggle_boolean_key ();      }
-    internal void set_selected_to_default () { current_child.set_selected_to_default (); }
+    internal virtual bool toggle_row_popover ()     // Menu
+    {
+        return browser_content.toggle_row_popover ();
+    }
 
     // current row property
-    internal string get_selected_row_name () { return current_child.get_selected_row_name (); }
-    internal string? get_copy_text ()        { return current_child.get_copy_text ();         }
-    internal string? get_copy_path_text ()   { return current_child.get_copy_path_text ();    }
-
-    // values changes
-    internal void gkey_value_push (string full_name, uint16 context_id, Variant key_value, bool is_key_default)
+    internal string get_selected_row_name () { return browser_content.get_selected_row_name (); }
+    internal override bool handle_copy_text (out string copy_text)
     {
-        current_child.gkey_value_push (full_name, context_id, key_value, is_key_default);
+        if (base.handle_copy_text (out copy_text))
+            return true;
+        return browser_content.handle_copy_text (out copy_text);
     }
-    internal void dkey_value_push (string full_name, Variant? key_value_or_null)
+    internal bool handle_alt_copy_text (out string copy_text)
     {
-        current_child.dkey_value_push (full_name, key_value_or_null);
+        return browser_content.handle_alt_copy_text (out copy_text);
     }
 }
 
@@ -318,10 +232,10 @@ private class BrowserView : Grid
 
 private class SortingOptions : Object
 {
-    public SettingsModel model { private get; construct; }
+    [CCode (notify = false)] public SettingsModel model { private get; construct; }
     private GLib.Settings settings = new GLib.Settings ("ca.desrt.dconf-editor.Settings");
 
-    internal bool case_sensitive { get; set; default = false; }
+    [CCode (notify = true)] internal bool case_sensitive { get; set; default = false; }
 
     construct
     {
@@ -376,6 +290,11 @@ private class SettingComparator : Object
 
     internal int compare (SimpleSettingObject a, SimpleSettingObject b)
     {
+        if (a.is_pinned)
+            return -1;
+        if (b.is_pinned)
+            return 1;
+
         if (a.context_id != b.context_id)
         {
             int sort_hint = 0;
@@ -428,8 +347,8 @@ private class SettingComparator : Object
     {
         uint16 a_place = sorted_context_id [a.context_id - ModelUtils.special_context_id_number];
         uint16 b_place = sorted_context_id [b.context_id - ModelUtils.special_context_id_number];
-        if (a_place == b_place)
-            assert_not_reached ();
+        if (a_place == b_place) // FIXME assert_not_reached() should be good, but crash happens if opening app on a key from a folder with
+            return 0;           // multiple schemas installed (e.g. '/ca/desrt/dconf-editor/bookmarks'), and immediately opening search
         return a_place < b_place ? -1 : 1;
     }
 }

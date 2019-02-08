@@ -18,10 +18,10 @@
 using Gtk;
 
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/modifications-revealer.ui")]
-private class ModificationsRevealer : Revealer
+private class ModificationsRevealer : Revealer, AdaptativeWidget
 {
     private ModificationsHandler _modifications_handler;
-    internal ModificationsHandler modifications_handler
+    [CCode (notify = false)] internal ModificationsHandler modifications_handler
     {
         private get { return _modifications_handler; }
         set
@@ -31,48 +31,51 @@ private class ModificationsRevealer : Revealer
         }
     }
 
+    StyleContext apply_button_context;
+    private bool disable_action_bar = false;
+    private bool short_size_button = false;
+    private void set_window_size (AdaptativeWidget.WindowSize new_size)
+    {
+        bool _disable_action_bar = AdaptativeWidget.WindowSize.is_extra_thin (new_size)
+                                || AdaptativeWidget.WindowSize.is_extra_flat (new_size);
+        if (disable_action_bar != _disable_action_bar)
+        {
+            disable_action_bar = _disable_action_bar;
+            update ();
+        }
+
+        bool _short_size_button = AdaptativeWidget.WindowSize.is_quite_thin (new_size);
+        if (short_size_button != _short_size_button)
+        {
+            short_size_button = _short_size_button;
+            if (_short_size_button)
+            {
+                apply_button_context.remove_class ("text-button");
+                apply_button.icon = apply_button_icon;
+                apply_button_context.add_class ("image-button");
+            }
+            else
+            {
+                apply_button_context.remove_class ("image-button");
+                apply_button.icon = null;
+                apply_button_context.add_class ("text-button");
+            }
+        }
+    }
+
     [GtkChild] private Label label;
     [GtkChild] private ModelButton apply_button;
     [GtkChild] private MenuButton delayed_list_button;
     [GtkChild] private Popover delayed_settings_list_popover;
-    [GtkChild] private ListBox delayed_settings_listbox;
+    [GtkChild] private ModificationsList modifications_list;
 
     private ThemedIcon apply_button_icon = new ThemedIcon.from_names ({"object-select-symbolic"});
 
     construct
     {
-        delayed_settings_listbox.set_header_func (delayed_setting_row_update_header);
-
+        apply_button_context = apply_button.get_style_context ();
         apply_button.icon = null;
         apply_button.get_style_context ().add_class ("text-button");
-    }
-
-    /*\
-    * * Window management callbacks
-    \*/
-
-    [GtkCallback]
-    private void on_size_allocate (Allocation allocation)   // TODO remaining warnings printed on redim when allocation width passes 900
-    {
-        StyleContext context = apply_button.get_style_context ();
-        if (allocation.width < 900)
-        {
-            if (apply_button.icon == null)
-            {
-                context.remove_class ("text-button");
-                apply_button.icon = apply_button_icon;
-                context.add_class ("image-button");
-            }
-        }
-        else
-        {
-            if (apply_button.icon != null)
-            {
-                context.remove_class ("image-button");
-                apply_button.icon = null;
-                context.add_class ("text-button");
-            }
-        }
     }
 
     /*\
@@ -129,7 +132,30 @@ private class ModificationsRevealer : Revealer
     private void warn_if_no_planned_changes ()
     {
         if (modifications_handler.dconf_changes_count == 0 && modifications_handler.gsettings_changes_count == 0)
+            /* Translators: displayed in the bottom bar in normal sized windows, when the user tries to reset keys from/for a folder that has nothing to reset */
             label.set_text (_("Nothing to reset."));
+            // FIXME appears twice
+    }
+
+    /*\
+    * * keyboard calls
+    \*/
+
+    internal bool next_match ()
+    {
+        return modifications_list.next_match ();
+    }
+
+    internal bool previous_match ()
+    {
+        return modifications_list.previous_match ();
+    }
+
+    internal bool handle_copy_text (out string copy_text)
+    {
+        if (delayed_list_button.active)
+            return modifications_list.handle_copy_text (out copy_text);
+        return BaseWindow.no_copy_text (out copy_text);
     }
 
     /*\
@@ -141,11 +167,11 @@ private class ModificationsRevealer : Revealer
         if (!delayed_list_button.active)
             return false;
 
-        ListBoxRow? selected_row = delayed_settings_listbox.get_selected_row ();
-        if (selected_row == null)
+        string? selected_row_name = modifications_list.get_selected_row_name ();
+        if (selected_row_name == null)
             return false;
 
-        modifications_handler.dismiss_change (((DelayedSettingView) (!) ((!) selected_row).get_child ()).full_name);
+        modifications_handler.dismiss_change ((!) selected_row_name);
         update ();
         return true;
     }
@@ -171,9 +197,12 @@ private class ModificationsRevealer : Revealer
 
     private Widget delayed_setting_row_create (Object object)
     {
-        string full_name = ((SimpleSettingObject) object).full_name;
-        uint16 context_id = ((SimpleSettingObject) object).context_id;
+        SimpleSettingObject sso = (SimpleSettingObject) object;
+        return create_delayed_setting_row (modifications_handler, sso.name, sso.full_name, sso.context_id);
+    }
 
+    internal static Widget create_delayed_setting_row (ModificationsHandler modifications_handler, string name, string full_name, uint16 context_id)
+    {
         SettingsModel model = modifications_handler.model;
 
         RegistryVariantDict properties = new RegistryVariantDict.from_aqv (model.get_key_properties (full_name, context_id, (uint16) (PropertyQuery.HAS_SCHEMA & PropertyQuery.IS_DEFAULT & PropertyQuery.DEFAULT_VALUE & PropertyQuery.KEY_VALUE)));
@@ -204,7 +233,7 @@ private class ModificationsRevealer : Revealer
 
         properties.clear ();
 
-        DelayedSettingView view = new DelayedSettingView (((SimpleSettingObject) object).name,
+        DelayedSettingView view = new DelayedSettingView (name,
                                                           full_name,
                                                           context_id,
                                                           has_schema_and_is_default,    // at row creation, key is never ghost
@@ -212,60 +241,13 @@ private class ModificationsRevealer : Revealer
                                                           cool_planned_value,
                                                           cool_default_value);
 
-        ListBoxRow wrapper = new ListBoxRow ();
-        wrapper.add (view);
         if (modifications_handler.get_current_delay_mode ())
         {
             Variant variant = new Variant ("(sq)", full_name, context_id);
-            wrapper.set_detailed_action_name ("ui.open-object(" + variant.print (true) + ")");
+            view.set_detailed_action_name ("browser.open-object(" + variant.print (true) + ")");
         }
-        return wrapper;
-    }
-
-    private void delayed_setting_row_update_header (ListBoxRow row, ListBoxRow? before)
-    {
-        string row_key_name = ((DelayedSettingView) row.get_child ()).full_name;
-        bool add_location_header = false;
-        if (before == null)
-            add_location_header = true;
-        else
-        {
-            string before_key_name = ((DelayedSettingView) ((!) before).get_child ()).full_name;
-
-            if (ModelUtils.get_parent_path (row_key_name) != ModelUtils.get_parent_path (before_key_name))
-                add_location_header = true;
-        }
-
-        if (add_location_header)
-        {
-            Grid location_header = new Grid ();
-            location_header.show ();
-            location_header.orientation = Orientation.VERTICAL;
-
-            Label location_header_label = new Label (ModelUtils.get_parent_path (row_key_name));
-            location_header_label.show ();
-            location_header_label.hexpand = true;
-            location_header_label.halign = Align.START;
-
-            StyleContext context = location_header_label.get_style_context ();
-            context.add_class ("dim-label");
-            context.add_class ("bold-label");
-            context.add_class ("list-row-header");
-
-            location_header.add (location_header_label);
-
-            Separator separator_header = new Separator (Orientation.HORIZONTAL);
-            separator_header.show ();
-            location_header.add (separator_header);
-
-            row.set_header (location_header);
-        }
-        else
-        {
-            Separator separator_header = new Separator (Orientation.HORIZONTAL);
-            separator_header.show ();
-            row.set_header (separator_header);
-        }
+        view.show ();
+        return view;
     }
 
     /*\
@@ -274,20 +256,12 @@ private class ModificationsRevealer : Revealer
 
     internal void gkey_value_push (string full_name, uint16 context_id, Variant key_value, bool is_key_default)
     {
-        delayed_settings_listbox.foreach ((widget) => {
-                DelayedSettingView row = (DelayedSettingView) ((Bin) widget).get_child ();
-                if (row.full_name == full_name && row.context_id == context_id)
-                    row.update_gsettings_key_current_value (key_value, is_key_default);
-            });
+        modifications_list.gkey_value_push (full_name, context_id, key_value, is_key_default);
     }
 
     internal void dkey_value_push (string full_name, Variant? key_value_or_null)
     {
-        delayed_settings_listbox.foreach ((widget) => {
-                DelayedSettingView row = (DelayedSettingView) ((Bin) widget).get_child ();
-                if (row.full_name == full_name)
-                    row.update_dconf_key_current_value (key_value_or_null);
-            });
+        modifications_list.dkey_value_push (full_name, key_value_or_null);
     }
 
     /*\
@@ -296,12 +270,17 @@ private class ModificationsRevealer : Revealer
 
     private void update ()
     {
-        GLib.ListStore modifications_list = modifications_handler.get_delayed_settings ();
-        delayed_settings_listbox.bind_model (modifications_list, delayed_setting_row_create);
-        if (modifications_list.get_n_items () == 0)
+        if (disable_action_bar)
+        {
+            set_reveal_child (false);
+            return;
+        }
+
+        GLib.ListStore modifications_liststore = modifications_handler.get_delayed_settings ();
+        modifications_list.bind_model (modifications_liststore, delayed_setting_row_create);
+
+        if (modifications_liststore.get_n_items () == 0)
             delayed_settings_list_popover.popdown ();
-        else
-            delayed_settings_listbox.select_row ((!) delayed_settings_listbox.get_row_at_index (0));
 
         if (modifications_handler.mode == ModificationsMode.NONE)
         {
@@ -316,6 +295,7 @@ private class ModificationsRevealer : Revealer
             if (total_changes_count == 0)
             {
                 apply_button.sensitive = false;
+                /* Translators: displayed in the bottom bar in normal sized windows, when the user edits a key and enters in the entry or text view a value that cannot be parsed to the correct data type */
                 label.set_text (_("The value is invalid."));
             }
             else if (total_changes_count != 1)
@@ -323,11 +303,13 @@ private class ModificationsRevealer : Revealer
             else if (modifications_handler.behaviour == Behaviour.ALWAYS_CONFIRM_EXPLICIT)
             {
                 apply_button.sensitive = true;
+                /* Translators: displayed in the bottom bar in normal sized windows, when the user edits a key (with the "always confirm explicit" behaviour) */
                 label.set_text (_("The change will be dismissed if you quit this view without applying."));
             }
             else if (modifications_handler.behaviour == Behaviour.ALWAYS_CONFIRM_IMPLICIT || modifications_handler.behaviour == Behaviour.SAFE)
             {
                 apply_button.sensitive = true;
+                /* Translators: displayed in the bottom bar in normal sized windows, when the user edits a key (with default "always confirm implicit" behaviour notably) */
                 label.set_text (_("The change will be applied on such request or if you quit this view."));
             }
             else
@@ -337,7 +319,9 @@ private class ModificationsRevealer : Revealer
         else // if (mode == Mode.DELAYED)
         {
             if (total_changes_count == 0)
+                /* Translators: displayed in the bottom bar in normal sized windows, when the user tries to reset keys from/for a folder that has nothing to reset */
                 label.set_text (_("Nothing to reset."));
+                // FIXME appears twice
             apply_button.sensitive = total_changes_count > 0;
             label.set_text (get_text (modifications_handler.dconf_changes_count, modifications_handler.gsettings_changes_count));
             set_reveal_child (true);
@@ -349,20 +333,28 @@ private class ModificationsRevealer : Revealer
         if (dconf == 0)
         {
             if (gsettings == 0)
+            /* Translators: Text displayed in the bottom bar; displayed if there are no pending changes, to document what is the "delay mode". */
                 return _("Changes will be delayed until you request it.");
-            /* Translators: "gsettings" is a technical term, notably a shell command, so you probably should not translate it. */
+
+            /* Translators: Text displayed in the bottom bar; "gsettings" is a technical term, notably a shell command, so you probably should not translate it. */
             return ngettext ("One gsettings operation delayed.", "%u gsettings operations delayed.", gsettings).printf (gsettings);
         }
         if (gsettings == 0)
-            /* Translators: "dconf" is a technical term, notably a shell command, so you probably should not translate it. */
+            /* Translators: Text displayed in the bottom bar; "dconf" is a technical term, notably a shell command, so you probably should not translate it. */
             return ngettext ("One dconf operation delayed.", "%u dconf operations delayed.", dconf).printf (dconf);
-            /* Translators: Beginning of a sentence like "One gsettings operation and 2 dconf operations delayed.", you could duplicate "delayed" if needed, as it refers to both the gsettings and dconf operations (at least one of each).
-                            Also, "gsettings" is a technical term, notably a shell command, so you probably should not translate it. */
-        return _("%s%s").printf (ngettext ("One gsettings operation", "%u gsettings operations", gsettings).printf (gsettings),
-            /* Translators: Second part (and end) of a sentence like "One gsettings operation and 2 dconf operations delayed.", so:
-                             * the space before the "and" is probably wanted, and
-                             * the "delayed" refers to both the gsettings and dconf operations (at least one of each).
-                            Also, "dconf" is a technical term, notably a shell command, so you probably should not translate it. */
-                                 ngettext (" and one dconf operation delayed.", " and %u dconf operations delayed.", dconf).printf (dconf));
+
+         /* Translators: Text displayed in the bottom bar. Hacky: I split a sentence like "One gsettings operation and 2 dconf operations delayed." in two parts, before the "and"; there is at least one gsettings operation and one dconf operation. So, you can either keep "%s%s" like that, and have the second part of the translation starting with a space (if that makes sense in your language), or you might use "%s %s" here. */
+        return _("%s%s").printf (
+
+         /* Translators: Text displayed in the bottom bar; beginning of a sentence like "One gsettings operation and 2 dconf operations delayed.", you could duplicate "delayed" if needed, as it refers to both the gsettings and dconf operations (at least one of each).
+            Also, "gsettings" is a technical term, notably a shell command, so you probably should not translate it. */
+            ngettext ("One gsettings operation", "%u gsettings operations", gsettings).printf (gsettings),
+
+         /* Translators: Text displayed in the bottom bar; second part (and end) of a sentence like "One gsettings operation and 2 dconf operations delayed.", so:
+             * the space before the "and" is probably wanted, if you keeped the "%s%s" translation as-is, and
+             * the "delayed" refers to both the gsettings and dconf operations (at least one of each).
+            Also, "dconf" is a technical term, notably a shell command, so you probably should not translate it. */
+            ngettext (" and one dconf operation delayed.", " and %u dconf operations delayed.", dconf).printf (dconf)
+        );
     }
 }
