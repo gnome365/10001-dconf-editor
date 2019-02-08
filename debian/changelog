@@ -1,8 +1,9 @@
-dconf-editor (3.31.90-1) UNRELEASED; urgency=medium
+dconf-editor (3.31.90-1) experimental; urgency=medium
 
-  * New upstream release
+  * New upstream development release
+  * Build-Depend on dh-sequence-gnome
 
- -- Jeremy Bicha <jbicha@debian.org>  Fri, 08 Feb 2019 10:37:04 -0500
+ -- Jeremy Bicha <jbicha@debian.org>  Fri, 08 Feb 2019 11:01:39 -0500
 
 dconf-editor (3.30.2-1) unstable; urgency=medium
 
