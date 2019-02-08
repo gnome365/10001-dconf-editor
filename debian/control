@@ -6,11 +6,10 @@ Source: dconf-editor
 Section: utils
 Priority: optional
 Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>
-Uploaders: Emilio Pozuelo Monfort <pochu@debian.org>, Jeremy Bicha <jbicha@debian.org>
+Uploaders: Jeremy Bicha <jbicha@debian.org>
 Build-Depends: debhelper-compat (= 12),
-               gnome-pkg-tools (>= 0.10),
+               dh-sequence-gnome,
                meson (>= 0.41.0),
-               appstream-util,
                valac (>= 0.33.1),
                libdconf-dev (>= 0.25.1),
                libglib2.0-dev (>= 2.55.1),
