@@ -228,7 +228,7 @@ msgstr ""
 "Nedrošās (unsafe) vērtības nav ieteicamas — atslēgām, kas ir “non-special-"
 "cased” tipa, to vērtības tiek atjauninātas katru reizi kaut kas mainās "
 "ierakstā, tātad arī starpstāvokļus. Drošā (safe) vērtība šādos gadījumos "
-"prasa  apstiprinājumu, bet ļauj tūlītējas izmaiņas Būla un nullējamos Būla "
+"prasa apstiprinājumu, bet ļauj tūlītējas izmaiņas Būla un nullējamos Būla "
 "tipos, uzskaitījumos un karogos. “always-confirm-implicit” un “always-"
 "confirm-explicit” vērtības vienmēr prasa apstiprināšanu, bet pirmais "
 "pielieto izmaiņas, ja maināt ceļu, savukārt otrs to atmet. “always-delay” "
@@ -714,7 +714,7 @@ msgid ""
 "no content, and can only take “()” as value."
 msgstr ""
 "It tukša korteža tips (ko dažkārt dēvē par “triv”), kas ir kortežs bez satura"
-"  un tā vērtība var būt tikai “()”."
+" un tā vērtība var būt tikai “()”."
 
 #: editor/ca.desrt.dconf-editor.gschema.xml:374
 msgid "An usual boolean value, defined by a relocatable schema."
@@ -825,13 +825,26 @@ msgstr "Konfliktējoša atslēga no Conflict2, kam vajadzētu dot brīdinājumu"
 msgid "Keyboard Shortcuts"
 msgstr "Tastatūras saīsnes"
 
-#: editor/dconf-editor-menu.ui:10
-msgid "_About"
-msgstr "P_ar"
+#. Translators: on really small windows, the about dialog is replaced by an in-window view; here is the label of one of two buttons that have the same role as the stack switcher in the usual about dialog, the second is "Credits"
+#. Translators: on really small windows, the about dialog is replaced by an in-window view; here is the name of the view, displayed in the headerbar
+#: editor/about-list.vala:44 editor/base-headerbar.vala:310
+msgid "About"
+msgstr "Par"
 
-#: editor/dconf-editor-menu.ui:14
-msgid "_Quit"
-msgstr "I_ziet"
+#. Translators: on really small windows, the about dialog is replaced by an in-window view; here is the label of one of two buttons that have the same role as the stack switcher in the usual about dialog, the first is "About"
+#: editor/about-list.vala:46
+msgid "Credits"
+msgstr "Autori"
+
+#. Translators: on really small windows, the about dialog is replaced by an in-window view; here is the header of the programmers names
+#: editor/about-list.vala:154
+msgid "Creators"
+msgstr "Veidotājs"
+
+#. Translators: on really small windows, the about dialog is replaced by an in-window view; here is the header of the translators names
+#: editor/about-list.vala:166
+msgid "Translators"
+msgstr "Tulkojuši"
 
 #: editor/dconf-editor.ui:34
 msgid "Actions"
@@ -930,12 +943,12 @@ msgstr "Lietotņu iekšējo iestatījumu grafiskais skatītājs un redaktors."
 #: editor/dconf-editor.vala:481
 msgid ""
 "Copyright © 2010-2014 – Canonical Ltd\n"
-"Copyright © 2015-2018 – Arnaud Bonatti\n"
-"Copyright © 2017-2018 – Davi da Silva Böger"
+"Copyright © 2017-2018 – Davi da Silva Böger\n"
+"Copyright © 2015-2019 – Arnaud Bonatti"
 msgstr ""
 "Autortiesības © 2010-2014 – Canonical Ltd\n"
-"Autortiesības © 2015-2018 – Arnaud Bonatti\n"
-"Autortiesības © 2017-2018 – Davi da Silva Böger"
+"Autortiesības © 2017-2018 – Davi da Silva Böger\n"
+"Autortiesības © 2015-2019 – Arnaud Bonatti"
 
 #: editor/dconf-editor.vala:485
 msgid "translator-credits"
@@ -1311,9 +1324,9 @@ msgstr[2] "%u gsettings darbības"
 #, c-format
 msgid " and one dconf operation delayed."
 msgid_plural " and %u dconf operations delayed."
-msgstr[0] "un %u dconf darbība ir aizturēta."
-msgstr[1] "un %u dconf darbības ir aizturētas."
-msgstr[2] "un %u dconf darbības ir aizturētas."
+msgstr[0] " un %u dconf darbība ir aizturēta."
+msgstr[1] " un %u dconf darbības ir aizturētas."
+msgstr[2] " un %u dconf darbības ir aizturētas."
 
 #: editor/pathbar.vala:316
 msgid "Copy current path"
@@ -1500,7 +1513,7 @@ msgid "conflicting keys"
 msgstr "konfliktējošās atslēgas"
 
 #: editor/registry-list.vala:377
-msgid "No Schema Found"
+msgid "No schema found"
 msgstr "Nav atrastu shēmu"
 
 #: editor/registry-search.vala:28
@@ -1527,58 +1540,143 @@ msgstr "Šajā ceļā atslēgu nav"
 msgid "Keys not defined by a schema"
 msgstr "Atslēgas nav definētas shēmā"
 
-#: editor/setting-object.vala:64
-msgid "Boolean"
-msgstr "Būla"
-
-#: editor/setting-object.vala:66
-msgid "String"
-msgstr "Virkne"
-
-#: editor/setting-object.vala:68
-msgid "String array"
-msgstr "Virkņu masīvs"
-
-#: editor/setting-object.vala:70
-msgid "Enumeration"
-msgstr "Uzskaitījums"
-
-#: editor/setting-object.vala:72
-msgid "Flags"
-msgstr "Karogi"
-
-#: editor/setting-object.vala:74
-msgid "Double"
-msgstr "Dubults"
-
-#. Translators: this handle type is an index; you may maintain the word "handle"
-#: editor/setting-object.vala:77
+#. Translators: that's the name of a data type; capitalized (if that makes sense); this handle type is an index; you may maintain the word "handle"
+#: editor/model-utils.vala:301
+msgctxt "capitalized"
 msgid "D-Bus handle type"
 msgstr "D-Bus tura tips"
 
-#: editor/setting-object.vala:79
+#. Translators: that's the name of a data type; capitalized (if that makes sense)
+#: editor/model-utils.vala:305
+msgctxt "capitalized"
 msgid "D-Bus object path"
 msgstr "D-Bus objektu ceļš"
 
-#: editor/setting-object.vala:81
+#. Translators: that's the name of a data type; capitalized (if that makes sense)
+#: editor/model-utils.vala:309
+msgctxt "capitalized"
 msgid "D-Bus object path array"
 msgstr "D-Bus objektu ceļa masīvs"
 
-#: editor/setting-object.vala:83
+#. Translators: that's the name of a data type; capitalized (if that makes sense)
+#: editor/model-utils.vala:313
+msgctxt "capitalized"
 msgid "D-Bus signature"
 msgstr "D-Bus paraksts"
 
-#: editor/setting-object.vala:91
+#. Translators: that's the name of a data type; non capitalized (if that makes sense); this handle type is an index; you may maintain the word "handle"
+#: editor/model-utils.vala:342
+msgctxt "non-capitalized"
+msgid "D-Bus handle type"
+msgstr "D-Bus tura tips"
+
+#. Translators: that's the name of a data type; non capitalized (if that makes sense)
+#: editor/model-utils.vala:346
+msgctxt "non-capitalized"
+msgid "D-Bus object path"
+msgstr "D-Bus objektu ceļš"
+
+#. Translators: that's the name of a data type; non capitalized (if that makes sense)
+#: editor/model-utils.vala:350
+msgctxt "non-capitalized"
+msgid "D-Bus object path array"
+msgstr "D-Bus objektu ceļa masīvs"
+
+#. Translators: that's the name of a data type; non capitalized (if that makes sense)
+#: editor/model-utils.vala:354
+msgctxt "non-capitalized"
+msgid "D-Bus signature"
+msgstr "D-Bus paraksts"
+
+#. Translators: that's the name of a data type; capitalized (if that makes sense)
+#: editor/model-utils.vala:391
+msgid "Boolean"
+msgstr "Būla"
+
+#. Translators: that's the name of a data type; non capitalized (if that makes sense)
+#: editor/model-utils.vala:394
+msgid "boolean"
+msgstr "būla"
+
+#. Translators: that's the name of a data type; capitalized (if that makes sense)
+#: editor/model-utils.vala:397
+msgid "String"
+msgstr "Virkne"
+
+#. Translators: that's the name of a data type; non capitalized (if that makes sense)
+#: editor/model-utils.vala:400
+msgid "string"
+msgstr "virkne"
+
+#. Translators: that's the name of a data type; capitalized (if that makes sense)
+#: editor/model-utils.vala:403
+msgid "String array"
+msgstr "Virkņu masīvs"
+
+#. Translators: that's the name of a data type; non capitalized (if that makes sense)
+#: editor/model-utils.vala:406
+msgid "string array"
+msgstr "virkņu masīvs"
+
+#. Translators: that's the name of a data type; capitalized (if that makes sense)
+#: editor/model-utils.vala:409
+msgid "Enumeration"
+msgstr "Uzskaitījums"
+
+#. Translators: that's the name of a data type; non capitalized (if that makes sense)
+#: editor/model-utils.vala:412
+msgid "enumeration"
+msgstr "uzskaitījums"
+
+#. Translators: that's the name of a data type; capitalized (if that makes sense)
+#: editor/model-utils.vala:415
+msgid "Flags"
+msgstr "Karogi"
+
+#. Translators: that's the name of a data type; non capitalized (if that makes sense)
+#: editor/model-utils.vala:418
+msgid "flags"
+msgstr "karogi"
+
+#. Translators: that's the name of a data type; capitalized (if that makes sense)
+#: editor/model-utils.vala:421
+msgid "Double"
+msgstr "Dubults"
+
+#. Translators: that's the name of a data type; non capitalized (if that makes sense)
+#: editor/model-utils.vala:424
+msgid "double"
+msgstr "dubults"
+
+#. Translators: that's the name of a data type; capitalized (if that makes sense)
+#: editor/model-utils.vala:451
 msgid "Integer"
 msgstr "Vesels skaitlis"
 
-#: editor/setting-object.vala:93
+#. Translators: that's the name of a data type; non capitalized (if that makes sense)
+#: editor/model-utils.vala:454
+msgid "integer"
+msgstr "vesels skaitlis"
+
+#. Translators: that's the name of a data type; capitalized (if that makes sense)
+#: editor/model-utils.vala:457
 msgid "Variant"
 msgstr "Variants"
 
-#: editor/setting-object.vala:95
+#. Translators: that's the name of a data type; non capitalized (if that makes sense)
+#: editor/model-utils.vala:460
+msgid "variant"
+msgstr "variants"
+
+#. Translators: that's the name of a data type; capitalized (if that makes sense)
+#: editor/model-utils.vala:463
 msgid "Empty tuple"
 msgstr "Tukšs kortežs"
+
+#. Translators: that's the name of a data type; non capitalized (if that makes sense)
+#: editor/model-utils.vala:466
+msgid "empty tuple"
+msgstr "tukšs kortežs"
 
 #: editor/setting-object.vala:214
 msgid "True"

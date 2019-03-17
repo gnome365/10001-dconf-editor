@@ -52,14 +52,22 @@ private class ConfigurationEditor : Gtk.Application, BaseApplication
                 "/org/gnome/epiphany/web/"},
             {"org.gnome.Epiphany.web",
                 "/org/gnome/epiphany/web-apps//web/"},
+            {"org.gnome.Epiphany.webapp",
+                "/org/gnome/epiphany/web-apps//webapp/"},
             {"org.gnome.nm-applet.eap",
                 "/org/gnome/nm-applet/eap//"},
-            {"org.gnome.Terminal.Legacy.Profile",
-                "/org/gnome/terminal/legacy/profiles://"},
+            {"org.gnome.seahorse.window",
+                "/apps/seahorse/windows//"},
             {"org.gnome.settings-daemon.plugins.media-keys.custom-keybinding",
                 "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings//"},
             {"org.gnome.settings-daemon.plugins.sharing.service",
                 "/org/gnome/settings-daemon/plugins/sharing//"},
+            {"org.gnome.software.auth",
+                "/org/gnome/software/auth//"},
+            {"org.gnome.Taquin.NightLight",
+                "/org/gnome/taquin/"},
+            {"org.gnome.Terminal.Legacy.Profile",
+                "/org/gnome/terminal/legacy/profiles://"},
 
             // TODO why a relocatable schema?
             {"org.gnome.Terminal.Legacy.Keybindings",
@@ -186,16 +194,16 @@ private class ConfigurationEditor : Gtk.Application, BaseApplication
     {
         Object (application_id: "ca.desrt.dconf-editor", flags: ApplicationFlags.HANDLES_COMMAND_LINE|ApplicationFlags.HANDLES_OPEN);
 
-        set_option_context_parameter_string ("[ PATH | [FIXED_SCHEMA|RELOC_SCHEMA:PATH] [KEY] ]");
-        /* Translators: command-line argument description, see 'dconf-editor --help'; try to put that string in 80 characters or less, if possible. */
+        set_option_context_parameter_string ("[ PATH | [FIXED_SCHEMA|RELOC_SCHEMA:DIR] [KEY] ]");
+        /* Translators: command-line text, description of the application in 'dconf-editor --help'; try to put that string in 80 characters or less, if possible. */
         set_option_context_summary (_("Graphical interface for editing other applications settings.")
                                   + "\n\n"
-        /* Translators: command-line argument description, see 'dconf-editor --help'; try to put that string in 80 characters or less, if possible. */
-                                  + _("Uses the gsettings API of the glib library, and other ways."));
+        /* Translators: command-line text, describes how the application proceeds for editing other applications settings, in 'dconf-editor --help'; try to put that string in 80 characters or less, if possible. */
+                                  + _("Uses the gsettings API of the glib library, among others."));
 
         /* Translators: command-line header description, see 'dconf-editor --help' */
         set_option_context_description (_("Arguments description:") +
-/* FIXME: PATH can only be a folder path if describing a relocatable schema */
+
 "\n  PATH" +
 /* Translators: command-line argument description, see 'dconf-editor --help' */
 "\n    " + _("a folder path or a key path") +
@@ -214,7 +222,7 @@ private class ConfigurationEditor : Gtk.Application, BaseApplication
 /* Translators: command-line argument description, see 'dconf-editor --help' */
 "\n    " + _("see list with the “--list-relocatable-schemas” option") +
 
-"\n  MAPPING" +
+"\n  DIR" +
 /* Translators: command-line argument description, see 'dconf-editor --help' */
 "\n    " + _("the path where to map the relocatable schema") +
 /* Translators: command-line argument description, see 'dconf-editor --help' */
