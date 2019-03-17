@@ -1,3 +1,53 @@
+dconf-editor 3.32.0
+=====================
+
+No code changes since last unstable release, new stable release!
+Since the last one, some UI changes, notably an editable pathbar
+and an improved bookmarks popover. The application will also run
+correctly on phone-sized screens, and gained keyboard shortcuts.
+
+Translations updated (since 3.31.91):
+  Basque: Asier Sarasua Garmendia
+  Czech: Marek Cernocky
+  Danish: Ask Hjorth Larsen
+  Dutch: Nathan Follens
+  French: Claude Paroz
+  Friulian: Fabio Tomat
+  German: Tim Sabsch
+  Icelandic: Sveinn í Felli
+  Italian: Milo Casagrande
+  Korean: Changwoo Ryu
+  Lithuanian: Aurimas Černius
+  Romanian: Daniel Șerbănescu
+  Serbian: Марко Костић
+  Slovenian: Matej Urbančič
+  Spanish: Daniel Mustieles
+  Swedish: Anders Jonsson
+
+dconf-editor 3.31.91
+=====================
+
+There was an hidden way to toggle search by clicking on an empty
+space of the headerbar, but it was blocking the use of a double-
+click to maximize the window, so that was removed. There is also
+some strings capitalization fixes, an improvement for the --help
+text, various small changes, and some relocatable schemas added.
+
+Translations updated:
+  Catalan: Jordi Mas
+  Czech: Marek Cernocky
+  Finnish: Jiri Grönroos
+  Galician: Fran Dieguez
+  Hungarian: Balázs Úr and Balázs Meskó
+  Indonesian: Kukuh Syafaat
+  Kazakh: Baurzhan Muftakhidinov
+  Lithuanian: Aurimas Černius
+  Polish: Piotr Drąg
+  Brazilian Portuguese: Rafael Fontenelle
+  Slovenian: Matej Urbančič
+  Spanish: Daniel Mustieles
+  Turkish: Sabri Ünal
+
 dconf-editor 3.31.90
 =====================
 
