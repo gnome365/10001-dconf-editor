@@ -361,7 +361,18 @@ private abstract class AdaptativeWindow : ApplicationWindow
     * * manage window state
     \*/
 
-    private GLib.Settings settings = new GLib.Settings ("ca.desrt.dconf-editor.Settings");
+    [CCode (notify = false)] public string schema_path
+    {
+        protected construct
+        {
+            string? _value = value;
+            if (_value == null)
+                assert_not_reached ();
+
+            settings = new GLib.Settings.with_path ("ca.desrt.dconf-editor.Lib", value);
+        }
+    }
+    private GLib.Settings settings;
 
     private int window_width = 0;
     private int window_height = 0;
@@ -401,6 +412,8 @@ private abstract class AdaptativeWindow : ApplicationWindow
     * * manage high-constrast
     \*/
 
+    internal signal void gtk_theme_changed ();
+
     private void manage_high_contrast ()
     {
         Gtk.Settings? nullable_gtk_settings = Gtk.Settings.get_default ();
@@ -409,18 +422,19 @@ private abstract class AdaptativeWindow : ApplicationWindow
 
         Gtk.Settings gtk_settings = (!) nullable_gtk_settings;
         gtk_settings.notify ["gtk-theme-name"].connect (update_highcontrast_state);
-        _update_highcontrast_state (gtk_settings);
+        _update_highcontrast_state (gtk_settings.gtk_theme_name);
     }
 
     private void update_highcontrast_state (Object gtk_settings, ParamSpec unused)
     {
-        _update_highcontrast_state ((Gtk.Settings) gtk_settings);
+        _update_highcontrast_state (((Gtk.Settings) gtk_settings).gtk_theme_name);
+        gtk_theme_changed ();
     }
 
     private bool highcontrast_state = false;
-    private void _update_highcontrast_state (Gtk.Settings gtk_settings)
+    private void _update_highcontrast_state (string theme_name)
     {
-        bool highcontrast_new_state = "HighContrast" in gtk_settings.gtk_theme_name;
+        bool highcontrast_new_state = "HighContrast" in theme_name;
         if (highcontrast_new_state == highcontrast_state)
             return;
         highcontrast_state = highcontrast_new_state;

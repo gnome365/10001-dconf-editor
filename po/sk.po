@@ -211,14 +211,14 @@ msgid ""
 "change path whereas the second dismiss it. The “always-delay” value adds "
 "each change in delay mode, allowing to apply multiple keys at once."
 msgstr ""
-"Hodnota „unsafe” (nebezpečné) sa neodporúča, u kľúčov, ktoré nemajú "
+"Hodnota  „unsafe” (nebezpečné) sa neodporúča, u kľúčov, ktoré nemajú "
 "špeciálny význam, sa hodnota kľúča zmení pri každej zmene vstupu, takže môže "
-"obsahovať aj prechodné stavy. Hodnota „safe” (bezpečné), si vyžaduje v "
+"obsahovať aj prechodné stavy.  Hodnota  „safe” (bezpečné) , si vyžaduje v "
 "tomto prípade vyžaduje potvrdenie, no umožňuje okamžité zmeny pre logické "
-"hodnoty, logické hodnoty s ničím, vymenovania hodnôt a príznaky. Hodnoty "
-"„always-confirm-implicit” (vždy potvrdiť implicitne) a „always-confirm-"
+"hodnoty, logické hodnoty s ničím, vymenovania hodnôt a príznaky. Hodnoty  "
+"„always-confirm-implicit” (vždy potvrdiť implicitne) a  „always-confirm-"
 "explicit” (vždy potvrdiť explicitne) si vždy vyžiadajú potvrdenie, no prvá "
-"aplikuje zmeny ak prejdete na iné miesto, druhá nie. Hodnota „always-"
+"aplikuje zmeny ak prejdete na iné miesto, druhá nie. Hodnota  „always-"
 "delay” (vždy počkať) pridá každú zmenu do režimu čakania, čo umožňuje zmeniť "
 "viacero kľúčov naraz."
 
@@ -331,10 +331,10 @@ msgstr "Typ obsluhy D-Bus, typ „h”"
 
 #: editor/ca.desrt.dconf-editor.gschema.xml:124
 msgid ""
-"The handle type is a 32-bit signed integer value that is, by convention, "
-"used as an index into an array of file descriptors that are sent alongside a "
-"D-Bus message. If you are not interacting with D-Bus, then there is no "
-"reason to make use of this type."
+"The handle type is a 32bit signed integer value that is, by convention, used "
+"as an index into an array of file descriptors that are sent alongside a D-"
+"Bus message. If you are not interacting with D-Bus, then there is no reason "
+"to make use of this type."
 msgstr ""
 "Typ obsluhy je 32 bitová hodnota so znamienkom, ktorý je podľa zvyku "
 "používaný ako ukazovateľ na pole popisovačov súborov, ktoré sú zasielané "
@@ -408,7 +408,7 @@ msgid "A short integer, type ‘n’"
 msgstr "Krátke celé číslo, typ „n”"
 
 #: editor/ca.desrt.dconf-editor.gschema.xml:162
-msgid "A 16-bit signed integer. See also the “integer-16-unsigned” key."
+msgid "A 16bit signed integer. See also the “integer-16-unsigned” key."
 msgstr ""
 "16 bitové celé číslo so znamienkom. Pozrite aj kľúč „integer-16-unsigned”."
 
@@ -426,7 +426,7 @@ msgid "An unsigned short integer, type ‘q’"
 msgstr "Krátke celé číslo bez znamienka, typ „q”"
 
 #: editor/ca.desrt.dconf-editor.gschema.xml:172
-msgid "A 16-bit unsigned integer. See also the “integer-16-signed” key."
+msgid "A 16bit unsigned integer. See also the “integer-16-signed” key."
 msgstr ""
 "16 bitové celé číslo bez znamienka. Pozrite aj kľúč „integer-16-signed”."
 
@@ -435,7 +435,7 @@ msgid "An usual integer, type ‘i’"
 msgstr "Celé číslo, typ „i”"
 
 #: editor/ca.desrt.dconf-editor.gschema.xml:177
-msgid "A 32-bit signed integer. See also the “integer-32-unsigned” key."
+msgid "A 32bit signed integer. See also the “integer-32-unsigned” key."
 msgstr ""
 "32 bitové celé číslo so znamienkom. Pozrite aj kľúč „integer-32-unsigned”."
 
@@ -444,7 +444,7 @@ msgid "An unsigned usual integer, type ‘u’"
 msgstr "Celé číslo bez znamienka, typ „u”"
 
 #: editor/ca.desrt.dconf-editor.gschema.xml:182
-msgid "A 32-bit unsigned integer. See also the “integer-32-signed” key."
+msgid "A 32bit unsigned integer. See also the “integer-32-signed” key."
 msgstr ""
 "32 bitové celé číslo bez znamienka. Pozrite aj kľúč „integer-32-signed”."
 
@@ -453,7 +453,7 @@ msgid "A long integer, type ‘x’"
 msgstr "Dlhé celé číslo, typ „x”"
 
 #: editor/ca.desrt.dconf-editor.gschema.xml:187
-msgid "A 64-bit signed integer. See also the “integer-64-unsigned” key."
+msgid "A 64bit signed integer. See also the “integer-64-unsigned” key."
 msgstr ""
 "64 bitové celé číslo so znamienkom. Pozrite aj kľúč „integer-64-unsigned”."
 
@@ -462,7 +462,7 @@ msgid "An unsigned long integer, type ‘t’"
 msgstr "Dlhé celé číslo bez znamienka, typ „t”"
 
 #: editor/ca.desrt.dconf-editor.gschema.xml:192
-msgid "A 64-bit unsigned integer. See also the “integer-64-signed” key."
+msgid "A 64bit unsigned integer. See also the “integer-64-signed” key."
 msgstr ""
 "64 bitové celé číslo bez znamienka. Pozrite aj kľúč „integer-64-signed”."
 
@@ -488,7 +488,7 @@ msgstr "Vlastný typ, typ „(ii)”"
 msgid ""
 "Dconf Editor lets you edit any settings type supported by GSettings, falling "
 "back on a string entry when it doesn’t have a better way to do. Here is a "
-"tuple of two 32-bit signed integers."
+"tuple of two 32bit signed integers."
 msgstr ""
 "Editor systému Dconf umožňuje upraviť nastavenia typu podporvaného v triede "
 "GSettings, ktoré sa premenia na reťazec, ak neexistuje lepší spôsob "
@@ -496,7 +496,7 @@ msgstr ""
 
 #: editor/ca.desrt.dconf-editor.gschema.xml:208
 msgid "A string, type ‘s’"
-msgstr "Reťazec, typ „s”"
+msgstr "Reťazec, typ \"s\""
 
 #: editor/ca.desrt.dconf-editor.gschema.xml:209
 msgid ""
@@ -561,26 +561,13 @@ msgstr ""
 msgid "Keyboard Shortcuts"
 msgstr "Klávesové skratky"
 
-#. Translators: on really small windows, the about dialog is replaced by an in-window view; here is the label of one of two buttons that have the same role as the stack switcher in the usual about dialog, the second is "Credits"
-#. Translators: on really small windows, the about dialog is replaced by an in-window view; here is the name of the view, displayed in the headerbar
-#: editor/about-list.vala:44 editor/base-headerbar.vala:310
-msgid "About"
-msgstr "O programe"
+#: editor/dconf-editor-menu.ui:10
+msgid "_About"
+msgstr "_O programe"
 
-#. Translators: on really small windows, the about dialog is replaced by an in-window view; here is the label of one of two buttons that have the same role as the stack switcher in the usual about dialog, the first is "About"
-#: editor/about-list.vala:46
-msgid "Credits"
-msgstr "Poďakovanie"
-
-#. Translators: on really small windows, the about dialog is replaced by an in-window view; here is the header of the programmers names
-#: editor/about-list.vala:154
-msgid "Creators"
-msgstr "Vytvoril"
-
-#. Translators: on really small windows, the about dialog is replaced by an in-window view; here is the header of the translators names
-#: editor/about-list.vala:166
-msgid "Translators"
-msgstr "Preložil"
+#: editor/dconf-editor-menu.ui:14
+msgid "_Quit"
+msgstr "U_končiť"
 
 #: editor/dconf-editor.ui:49
 msgid "Actions"
@@ -611,12 +598,12 @@ msgstr "Skopírované do schránky"
 #: editor/dconf-editor.vala:150
 msgid ""
 "Copyright © 2010-2014 – Canonical Ltd\n"
-"Copyright © 2017-2018 – Davi da Silva Böger\n"
-"Copyright © 2015-2019 – Arnaud Bonatti"
+"Copyright © 2015-2018 – Arnaud Bonatti\n"
+"Copyright © 2017-2018 – Davi da Silva Böger"
 msgstr ""
 "Autorské práva © 2010-2014 – Canonical Ltd\n"
-"Autorské práva © 2017-2018 – Davi da Silva Böger\n"
-"Autorské práva © 2015-2019 – Arnaud Bonatti"
+"Autorské práva © 2015-2018 – Arnaud Bonatti\n"
+"Autorské práva © 2017-2018 – Davi da Silva Böger"
 
 #: editor/dconf-editor.vala:154
 msgid "translator-credits"
@@ -624,159 +611,75 @@ msgstr ""
 "Pavol Klačanský <pavol@klacansky.com>\n"
 "Dušan Kazik <prescott66@gmail.com>"
 
-#. Translators: that's the name of a data type; capitalized (if that makes sense); this handle type is an index; you may maintain the word "handle"
-#: editor/model-utils.vala:301
-msgctxt "capitalized"
-msgid "D-Bus handle type"
-msgstr "Typ obsluhy zbernice D-Bus"
-
-#. Translators: that's the name of a data type; capitalized (if that makes sense)
-#: editor/model-utils.vala:305
-msgctxt "capitalized"
-msgid "D-Bus object path"
-msgstr "Cesta objektu zbernice D-Bus"
-
-#. Translators: that's the name of a data type; capitalized (if that makes sense)
-#: editor/model-utils.vala:309
-msgctxt "capitalized"
-msgid "D-Bus object path array"
-msgstr "Pole ciest objektov zbernice D-Bus"
-
-#. Translators: that's the name of a data type; capitalized (if that makes sense)
-#: editor/model-utils.vala:313
-msgctxt "capitalized"
-msgid "D-Bus signature"
-msgstr "Podpis zbernice D-Bus"
-
-#. Translators: that's the name of a data type; non capitalized (if that makes sense); this handle type is an index; you may maintain the word "handle"
-#: editor/model-utils.vala:342
-msgctxt "non-capitalized"
-msgid "D-Bus handle type"
-msgstr "typ obsluhy zbernice D-Bus"
-
-#. Translators: that's the name of a data type; non capitalized (if that makes sense)
-#: editor/model-utils.vala:346
-msgctxt "non-capitalized"
-msgid "D-Bus object path"
-msgstr "cesta objektu zbernice D-Bus"
-
-#. Translators: that's the name of a data type; non capitalized (if that makes sense)
-#: editor/model-utils.vala:350
-msgctxt "non-capitalized"
-msgid "D-Bus object path array"
-msgstr "pole ciest objektov zbernice D-Bus"
-
-#. Translators: that's the name of a data type; non capitalized (if that makes sense)
-#: editor/model-utils.vala:354
-msgctxt "non-capitalized"
-msgid "D-Bus signature"
-msgstr "podpis zbernice D-Bus"
-
-#. Translators: that's the name of a data type; capitalized (if that makes sense)
-#: editor/model-utils.vala:391
+#: editor/dconf-model.vala:220
 msgid "Boolean"
 msgstr "Logická hodnota"
 
-#. Translators: that's the name of a data type; non capitalized (if that makes sense)
-#: editor/model-utils.vala:394
-msgid "boolean"
-msgstr "logická hodnota"
-
-#. Translators: that's the name of a data type; capitalized (if that makes sense)
-#: editor/model-utils.vala:397
+#: editor/dconf-model.vala:222
 msgid "String"
 msgstr "Reťazec"
 
-#. Translators: that's the name of a data type; non capitalized (if that makes sense)
-#: editor/model-utils.vala:400
-msgid "string"
-msgstr "reťazec"
-
-#. Translators: that's the name of a data type; capitalized (if that makes sense)
-#: editor/model-utils.vala:403
+#: editor/dconf-model.vala:224
 msgid "String array"
 msgstr "Pole reťazcov"
 
-#. Translators: that's the name of a data type; non capitalized (if that makes sense)
-#: editor/model-utils.vala:406
-msgid "string array"
-msgstr "pole reťazcov"
-
-#. Translators: that's the name of a data type; capitalized (if that makes sense)
-#: editor/model-utils.vala:409
+#: editor/dconf-model.vala:226
 msgid "Enumeration"
 msgstr "Vymenovanie hodnôt"
 
-#. Translators: that's the name of a data type; non capitalized (if that makes sense)
-#: editor/model-utils.vala:412
-msgid "enumeration"
-msgstr "vymenovanie hodnôt"
-
-#. Translators: that's the name of a data type; capitalized (if that makes sense)
-#: editor/model-utils.vala:415
+#: editor/dconf-model.vala:228
 msgid "Flags"
 msgstr "Príznaky"
 
-#. Translators: that's the name of a data type; non capitalized (if that makes sense)
-#: editor/model-utils.vala:418
-msgid "flags"
-msgstr "príznaky"
-
-#. Translators: that's the name of a data type; capitalized (if that makes sense)
-#: editor/model-utils.vala:421
+#: editor/dconf-model.vala:230
 msgid "Double"
 msgstr "Desatinné číslo"
 
-#. Translators: that's the name of a data type; non capitalized (if that makes sense)
-#: editor/model-utils.vala:424
-msgid "double"
-msgstr "desatinné číslo"
+#. Translators: this handle type is an index; you may maintain the word "handle"
+#: editor/dconf-model.vala:233
+msgid "D-Bus handle type"
+msgstr "Typ obsluhy zbernice D-Bus"
 
-#. Translators: that's the name of a data type; capitalized (if that makes sense)
-#: editor/model-utils.vala:451
+#: editor/dconf-model.vala:235
+msgid "D-Bus object path"
+msgstr "Cesta objektu zbernice D-Bus"
+
+#: editor/dconf-model.vala:237
+msgid "D-Bus object path array"
+msgstr "Pole ciest objektov zbernice D-Bus"
+
+#: editor/dconf-model.vala:239
+msgid "D-Bus signature"
+msgstr "Podpis zbernice D-Bus"
+
+#: editor/dconf-model.vala:247
 msgid "Integer"
 msgstr "Celé číslo"
 
-#. Translators: that's the name of a data type; non capitalized (if that makes sense)
-#: editor/model-utils.vala:454
-msgid "integer"
-msgstr "celé číslo"
-
-#. Translators: the boolean "true" value; capitalized (if that makes sense)
-#: editor/setting-object.vala:173
+#: editor/dconf-model.vala:362
 msgid "True"
-msgstr "Pravda"
+msgstr "Pravda (True)"
 
-#. Translators: the boolean "false" value; capitalized (if that makes sense)
-#: editor/setting-object.vala:177
+#: editor/dconf-model.vala:364
 msgid "False"
-msgstr "Nepravda"
+msgstr "Nepravda (False)"
 
-#. Translators: "nothing" value of a nullable key; capitalized (if that makes sense); "nothing" here is a keyword, but you do not need to show it in your translation, that will be done with the non-capitalized version of the word
-#: editor/setting-object.vala:180
+#: editor/dconf-model.vala:365
 msgid "Nothing"
-msgstr "Nič"
+msgstr "Nič (Nothing)"
 
-#. Translators: the boolean "true" value; non capitalized (if that makes sense)
-#: editor/setting-object.vala:186
+#: editor/dconf-model.vala:370
 msgid "true"
-msgstr "pravda"
+msgstr "pravda (true)"
 
-#. Translators: the boolean "false" value; non capitalized (if that makes sense)
-#: editor/setting-object.vala:190
+#: editor/dconf-model.vala:372
 msgid "false"
-msgstr "nepravda"
+msgstr "nepravda (false)"
 
-#. Translators: "nothing" value of a nullable key; non capitalized (if that makes sense); the %s is replaced by the text "nothing" (as a technical keyword); it isn't introduced with quotation marks around it, but you might want to add some, depending of your language typographic rules
-#: editor/setting-object.vala:194
-#, c-format
-msgid "nothing (%s)"
-msgstr "nič (%s)"
-
-#. Translators: "nothing" value of a nullable key; non capitalized (if that makes sense)
-#: editor/setting-object.vala:199
+#. Translators: "nothing" here is a keyword that should appear for consistence; please translate as "yourtranslation (nothing)"
+#: editor/dconf-model.vala:374
 msgid "nothing"
-msgstr "nič"
+msgstr "nič (nothing)"
 
 #: editor/dconf-view.vala:438
 msgid "This value is invalid for the key type."
@@ -930,9 +833,9 @@ msgctxt "shortcut window"
 msgid "Quit"
 msgstr "Ukončenie"
 
-#. Translators: "subtitle" in the keys list of a key not defined by a schema; keys defined by a schema have in place a summary describing the key use
-#: editor/registry-list.vala:537
-msgid "No schema found"
+# Schema:
+#: editor/key-list-box-row.vala:188
+msgid "No Schema Found"
 msgstr "Nenašla sa žiadna schéma"
 
 #: editor/key-list-box-row.vala:202
@@ -1098,11 +1001,6 @@ msgstr ""
 "pravdepodobne chyba aplikácie, ktorá inštalovala túto schému. Ak je to "
 "možné, prosím podajte o tomto chybové hlásenie."
 
-#. Translators: field description when displaying folder properties; name of the folder
-#: editor/registry-info.vala:70
-msgid "Name"
-msgstr "Názov"
-
 #: editor/registry-info.vala:82
 msgid "Schema"
 msgstr "Schéma"
@@ -1152,8 +1050,8 @@ msgid ""
 "empty value. Strings, signatures and object paths should be surrounded by "
 "quotation marks."
 msgstr ""
-"Ak chcete pre typ možno (typ začínajúci „m”) nastaviť prázdnu hodnotu, "
-"použite kľúčové slovo „nothing”. Reťazce, podpisy a cesty objektov je "
+"Ak chcete pre typ možno (typ začínajúci  „m”) nastaviť prázdnu hodnotu, "
+"použite kľúčové slovo  „nothing”. Reťazce, podpisy a cesty objektov je "
 "potrebné zadať do úvodzoviek."
 
 #: editor/registry-info.vala:326
@@ -1167,8 +1065,8 @@ msgid ""
 "Use the keyword “nothing” to set a maybe type (beginning with “m”) to its "
 "empty value."
 msgstr ""
-"Ak chcete pre typ možno (typ začínajúci „m”) nastaviť prázdnu hodnotu, "
-"použite kľúčové slovo „nothing”."
+"Ak chcete pre typ možno (typ začínajúci  „m”) nastaviť prázdnu hodnotu, "
+"použite kľúčové slovo  „nothing”."
 
 #: editor/registry-view.ui:32
 msgid "Sort preferences have changed. Do you want to reload the view?"
@@ -1197,12 +1095,20 @@ msgstr "Tu sa nedá nájsť kľúč „%s”."
 msgid "Key “%s” has been removed."
 msgstr "Kľúč „%s” bol odstránený."
 
+#, fuzzy
+#~ msgid "dconf-editor"
+#~ msgstr "Editor systému dconf"
+
 #~ msgctxt "shortcut window"
 #~ msgid "Current row menu"
 #~ msgstr "Ponuka pre aktuálny riadok"
 
 #~ msgid "The theme of the navigation list"
 #~ msgstr "Téma navigačného zoznamu"
+
+# %s %s range
+#~ msgid "Double [%s..%s]"
+#~ msgstr "Double [%s..%s]"
 
 #~ msgid "Oops! Cannot find something at this path."
 #~ msgstr "Ale nie! Na tejto ceste sa nepodarilo niečo nájsť."
@@ -1240,8 +1146,43 @@ msgstr "Kľúč „%s” bol odstránený."
 #~ msgid "Not found"
 #~ msgstr "Nenajdený"
 
+#~ msgid ""
+#~ "This program is free software; you can redistribute it and/or modify it "
+#~ "under the terms of the GNU General Public License as published by the "
+#~ "Free Software Foundation; either version 2 of the License, or (at your "
+#~ "option) any later version.\n"
+#~ "\n"
+#~ "This program is distributed in the hope that it will be useful, but "
+#~ "WITHOUT ANY WARRANTY; without even the implied warranty of "
+#~ "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General "
+#~ "Public License for more details.\n"
+#~ "\n"
+#~ "You should have received a copy of the GNU General Public License along "
+#~ "with this program; if not, write to the Free Software Foundation, Inc., "
+#~ "51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA"
+#~ msgstr ""
+#~ "Tento program je slobodný softvér. Môžete ho ďalej šíriť a/alebo "
+#~ "upravovať podľa ustanovení licencie GNU General Public License "
+#~ "(Všeobecnej zverejňovacej licencie GNU), vydávanej nadáciou Free Software "
+#~ "Foundation, a to buď 2. verzie tejto licencie, alebo (podľa vášho "
+#~ "uváženia) ktorejkoľvek neskoršej verzie.\n"
+#~ "\n"
+#~ "Tento program je rozširovaný v nádeji, že bude užitočný, avšak BEZ "
+#~ "AKEJKOĽVEK ZÁRUKY. Neposkytujú sa ani odvodené záruky PREDAJNOSTI alebo "
+#~ "VHODNOSTI NA URČITÝ ÚČEL. Ďalšie podrobnosti hľadajte  v licencii GNU "
+#~ "General Public License.\n"
+#~ "Kópiu licencie GNU General Public License ste mali dostať spolu s týmto "
+#~ "programom Ak sa tak nestalo, napíšte na adresu Free Software Foundation, "
+#~ "Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA"
+
+#~ msgid "Copyright © Canonical Ltd"
+#~ msgstr "Autorské práva © Canonical Ltd"
+
 #~ msgid "Error setting value: %s"
 #~ msgstr "Chyba pri nastavovaní hodnoty: %s"
+
+#~ msgid "Name"
+#~ msgstr "Názov"
 
 #~ msgid "Value"
 #~ msgstr "Hodnota"
