@@ -23,7 +23,7 @@ private class ConfigurationEditor : Gtk.Application, BaseApplication
     internal static string [,] internal_mappings = {
             {"ca.desrt.dconf-editor.Bookmarks",
                 "/ca/desrt/dconf-editor/"},
-            {"ca.desrt.dconf-editor.NightLight",
+            {"ca.desrt.dconf-editor.Lib",
                 "/ca/desrt/dconf-editor/"},
 
             {"ca.desrt.dconf-editor.Demo.EmptyRelocatable",
@@ -64,7 +64,11 @@ private class ConfigurationEditor : Gtk.Application, BaseApplication
                 "/org/gnome/settings-daemon/plugins/sharing//"},
             {"org.gnome.software.auth",
                 "/org/gnome/software/auth//"},
-            {"org.gnome.Taquin.NightLight",
+            {"org.gnome.Reversi.Lib",
+                "/org/gnome/iagno/"},
+            {"org.gnome.Taquin.Lib",
+                "/org/gnome/taquin/"},
+            {"org.gnome.Taquin.NightLight", // removed in 3.34
                 "/org/gnome/taquin/"},
             {"org.gnome.Terminal.Legacy.Profile",
                 "/org/gnome/terminal/legacy/profiles://"},
@@ -192,7 +196,7 @@ private class ConfigurationEditor : Gtk.Application, BaseApplication
 
     private ConfigurationEditor ()
     {
-        Object (application_id: "ca.desrt.dconf-editor", flags: ApplicationFlags.HANDLES_COMMAND_LINE|ApplicationFlags.HANDLES_OPEN);
+        Object (application_id: "ca.desrt.dconf-editor", flags: ApplicationFlags.HANDLES_COMMAND_LINE|ApplicationFlags.HANDLES_OPEN|ApplicationFlags.CAN_OVERRIDE_APP_ID);
 
         set_option_context_parameter_string ("[ PATH | [FIXED_SCHEMA|RELOC_SCHEMA:DIR] [KEY] ]");
         /* Translators: command-line text, description of the application in 'dconf-editor --help'; try to put that string in 80 characters or less, if possible. */

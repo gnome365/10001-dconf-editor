@@ -1,3 +1,73 @@
+dconf-editor 3.34.1
+=====================
+
+Fix the appdata file (I probably should add a validation here…).
+
+dconf-editor 3.34.0
+=====================
+
+New stable 3.34 release. No changes since last unstable release,
+and –surprise– mostly no changes since last stable release also.
+
+Translations updated:
+  Catalan: Jordi Mas
+  Croatian: Goran Vidović
+  French: Claude Paroz
+  Friulian: Fabio Tomat
+  Galician: Fran Dieguez
+  German: Tim Sabsch
+  Greek: Efstathios Iosifidis
+  Hungarian: Balázs Úr
+  Italian: Milo Casagrande
+  Korean: Changwoo Ryu
+  Latvian: Rūdolfs Mazurs
+  Polish: Piotr Drąg
+  Brazilian Portuguese: Rafael Fontenelle
+  Serbian: Марко Костић
+  Slovenian: Matej Urbančič
+  Spanish: Daniel Mustieles
+  Turkish: Sabri Ünal
+
+dconf-editor 3.33.91
+=====================
+
+Two small bugs fixed (thanks Adrien), all looks good here (2nd).
+
+Translations updated:
+  Basque: Asier Sarasua Garmendia
+  Czech: Marek Černocký
+  British English: Bruce Cowan
+  Indonesian: Kukuh Syafaat
+  Lithuanian: Aurimas Černius
+
+dconf-editor 3.33.90
+=====================
+
+Only small changes, all looks good here.
+
+Translation updated:
+  Romanian: Florentina Mușat
+  Swedish: Anders Jonsson
+
+dconf-editor 3.33.4
+=====================
+
+Some updates of the DTD and the appdata fields; and just a small
+change, that allows running multiple instances, for a hacky use.
+
+Translations updated:
+  Catalan: Carles Ferrando Garcia and Jordi Mas
+  Croatian: Goran Vidović
+  Danish: Ask Hjorth Larsen
+  British English: Bruce Cowan
+  Greek: Efstathios Iosifidis
+  Italian: Milo Casagrande
+  Latvian: Rūdolfs Mazurs
+  Romanian: Daniel Șerbănescu
+  Slovenian: Matej Urbančič
+  Spanish: Daniel Mustieles
+  Turkish: Sabri Ünal
+
 dconf-editor 3.32.0
 =====================
 
