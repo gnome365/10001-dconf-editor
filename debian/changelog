@@ -1,3 +1,9 @@
+dconf-editor (3.34.1-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+
+ -- Jeremy Bicha <jbicha@debian.org>  Sun, 22 Sep 2019 12:11:56 -0400
+
 dconf-editor (3.32.0-1) experimental; urgency=medium
 
   * New upstream release
