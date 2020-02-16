@@ -156,15 +156,15 @@ private class ConfigurationEditor : Gtk.Application, BaseApplication
     private const OptionEntry [] option_entries =
     {
         /* Translators: command-line option description, see 'dconf-editor --help' */
-        { "version", 'v', 0, OptionArg.NONE, null, N_("Print release version and exit"), null },
+        { "version", 'v', OptionFlags.NONE, OptionArg.NONE, null, N_("Print release version and exit"), null },
 
         /* Translators: command-line option description, see 'dconf-editor --help' */
-        { "list-relocatable-schemas", 0, 0, OptionArg.NONE, null, N_("Print relocatable schemas and exit"), null },
+        { "list-relocatable-schemas", 0, OptionFlags.NONE, OptionArg.NONE, null, N_("Print relocatable schemas and exit"), null },
 
         /* Translators: command-line option description, see 'dconf-editor --help'; the option removes the initial "use at your own risks" dialog */
-        { "I-understand-that-changing-options-can-break-applications", 0, 0, OptionArg.NONE, ref disable_warning, N_("Do not show initial warning"), null },
+        { "I-understand-that-changing-options-can-break-applications", 0, OptionFlags.NONE, OptionArg.NONE, ref disable_warning, N_("Do not show initial warning"), null },
 
-        { OPTION_REMAINING, 0, 0, OptionArg.STRING_ARRAY, ref remaining, "args", null },
+        { OPTION_REMAINING, 0, OptionFlags.NONE, OptionArg.STRING_ARRAY, ref remaining, "args", null },
         {}
     };
 
@@ -656,10 +656,25 @@ private class ConfigurationEditor : Gtk.Application, BaseApplication
         comments = _("A graphical viewer and editor of applications’ internal settings.");
 
         artists = {};
-        authors = { "Robert Ancell", "Arnaud Bonatti" };
+        authors = {
+        /* Translators: text crediting a game author, seen in the About dialog */
+            _("Robert Ancell"),
 
-        /* Translators: about dialog text */
-        copyright = _("Copyright \xc2\xa9 2010-2014 – Canonical Ltd\nCopyright \xc2\xa9 2017-2018 – Davi da Silva Böger\nCopyright \xc2\xa9 2015-2019 – Arnaud Bonatti");
+
+        /* Translators: text crediting a game author, seen in the About dialog */
+            _("Arnaud Bonatti")
+        };
+
+        /* Translators: text crediting a maintainer, seen in the About dialog */
+        copyright = _("Copyright \xc2\xa9 2010-2014 – Canonical Ltd") + "\n" +
+
+
+        /* Translators: text crediting a maintainer, seen in the About dialog */
+                    _("Copyright \xc2\xa9 2017-2018 – Davi da Silva Böger") + "\n" +
+
+
+        /* Translators: text crediting a maintainer, seen in the About dialog; the %u are replaced with the years of start and end */
+                    _("Copyright \xc2\xa9 %u-%u – Arnaud Bonatti").printf (2015, 2020);
 
         documenters = {};
         logo_icon_name = "ca.desrt.dconf-editor";
