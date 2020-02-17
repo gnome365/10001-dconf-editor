@@ -1,3 +1,9 @@
+dconf-editor (3.35.91-2) unstable; urgency=medium
+
+  * debian/docs: README is now README.md
+
+ -- Jeremy Bicha <jbicha@debian.org>  Sun, 16 Feb 2020 19:34:46 -0500
+
 dconf-editor (3.35.91-1) unstable; urgency=medium
 
   * New upstream beta release
