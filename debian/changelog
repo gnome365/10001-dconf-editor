@@ -1,3 +1,9 @@
+dconf-editor (3.38.0-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+
+ -- Sebastien Bacher <seb128@ubuntu.com>  Tue, 15 Sep 2020 20:42:40 +0200
+
 dconf-editor (3.36.2-1) unstable; urgency=medium
 
   * New upstream release
