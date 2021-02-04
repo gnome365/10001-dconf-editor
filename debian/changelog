@@ -1,3 +1,9 @@
+dconf-editor (3.38.2-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+
+ -- Simon McVittie <smcv@debian.org>  Thu, 04 Feb 2021 09:53:25 +0000
+
 dconf-editor (3.38.0-1) unstable; urgency=medium
 
   * New upstream release
