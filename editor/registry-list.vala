@@ -20,8 +20,8 @@ using Gtk;
 [GtkTemplate (ui = "/ca/desrt/dconf-editor/ui/registry-list.ui")]
 private abstract class RegistryList : Grid, BrowsableView, AdaptativeWidget
 {
-    [GtkChild] protected ListBox key_list_box;
-    [GtkChild] private ScrolledWindow scrolled;
+    [GtkChild] protected unowned ListBox key_list_box;
+    [GtkChild] private unowned ScrolledWindow scrolled;
     private Adjustment adjustment;
 
     [CCode (notify = false)] protected bool search_mode { private get; protected set; }
@@ -34,7 +34,7 @@ private abstract class RegistryList : Grid, BrowsableView, AdaptativeWidget
 
     [CCode (notify = false)] internal ModificationsHandler modifications_handler { protected get; set; }
 
-    [GtkChild] private RegistryPlaceholder placeholder;
+    [GtkChild] private unowned RegistryPlaceholder placeholder;
     [CCode (notify = false)] public abstract string placeholder_label { protected get; }
 
     construct
@@ -291,9 +291,9 @@ private abstract class RegistryList : Grid, BrowsableView, AdaptativeWidget
 
     internal bool handle_copy_text (out string copy_text) // can compile with "private", but is public 1/2
     {
-        return _handle_copy_text (out copy_text, ref key_list_box);
+        return _handle_copy_text (out copy_text, key_list_box);
     }
-    private bool _handle_copy_text (out string copy_text, ref ListBox key_list_box)
+    private bool _handle_copy_text (out string copy_text, ListBox key_list_box)
     {
         ListBoxRow? selected_row = (ListBoxRow?) key_list_box.get_selected_row ();
         if (selected_row == null)
@@ -1138,7 +1138,7 @@ private abstract class RegistryList : Grid, BrowsableView, AdaptativeWidget
     * * headers
     \*/
 
-    protected static bool is_first_row (int row_index, ref unowned ListBoxRow? before)
+    protected static bool is_first_row (int row_index, ListBoxRow? before)
     {
         bool is_first_row = row_index == 0;
         if (is_first_row != (before == null))
