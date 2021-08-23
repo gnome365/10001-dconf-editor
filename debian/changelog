@@ -1,3 +1,9 @@
+dconf-editor (3.38.3-2) unstable; urgency=medium
+
+  * Release to unstable
+
+ -- Jeremy Bicha <jbicha@debian.org>  Sun, 22 Aug 2021 22:37:10 -0400
+
 dconf-editor (3.38.3-1) experimental; urgency=medium
 
   * New upstream release
