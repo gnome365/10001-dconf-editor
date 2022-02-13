@@ -1,3 +1,12 @@
+dconf-editor (3.38.3-3) unstable; urgency=medium
+
+  * Team upload
+  * d/p/editor-meson.build-fix-meson-0.61-errors.patch:
+    Add patch from upstream MR !21 to fix FTBFS with Meson 0.61
+    (Closes: #1005599)
+
+ -- Simon McVittie <smcv@debian.org>  Sun, 13 Feb 2022 12:36:59 +0000
+
 dconf-editor (3.38.3-2) unstable; urgency=medium
 
   * Release to unstable
