@@ -1,8 +1,12 @@
-dconf-editor (43~beta-1) UNRELEASED; urgency=medium
+dconf-editor (43~beta-1) unstable; urgency=medium
 
   * New upstream release
+  * debian/control.in: Build-Depend on libhandy for GNOME 42 dark style support
+  * debian/control.in: Bump Standards-Version to 4.6.1
+  * debian/control.in: Set Rules-Requires-Root: no
+  * Drop patch: applied in new release
 
- -- Jeremy Bicha <jbicha@ubuntu.com>  Wed, 27 Jul 2022 16:15:36 -0400
+ -- Jeremy Bicha <jbicha@ubuntu.com>  Wed, 27 Jul 2022 16:22:13 -0400
 
 dconf-editor (3.38.3-3) unstable; urgency=medium
 
